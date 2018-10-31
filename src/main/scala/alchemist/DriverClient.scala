@@ -27,6 +27,8 @@ class DriverClient {          // Connects to the Alchemist driver
 
   var driverProc: Process = _
 
+  var clientID: Short = 0
+  var sessionID: Short = 0
 
   var sock: Socket = _
   var in: InputStream = _
@@ -106,10 +108,10 @@ class DriverClient {          // Connects to the Alchemist driver
 
     val in = sock.getInputStream
 
-    val header: Array[Byte] = Array.fill[Byte](5)(0)
+    val header: Array[Byte] = Array.fill[Byte](9)(0)
     val packet: Array[Byte] = Array.fill[Byte](8192)(0)
 
-    in.read(header, 0, 5)
+    in.read(header, 0, 9)
 
     readMessage.reset
     readMessage.addHeader(header)
@@ -160,7 +162,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def handshake: Boolean = {
 
-    writeMessage.start("HANDSHAKE")
+    writeMessage.start(0, 0, "HANDSHAKE")
 
     writeMessage.writeByte(2)
     writeMessage.writeShort(1234)
@@ -173,7 +175,8 @@ class DriverClient {          // Connects to the Alchemist driver
     if (readMessage.readCommandCode == 1) {
       if (readMessage.readShort == 4321) {
         if (readMessage.readString == "DCBA") {
-          handshakeSuccess = true
+          clientID = readMessage.readClientID
+          sessionID = readMessage.readSessionID
         }
       }
     }
@@ -183,7 +186,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def requestID: this.type = {
 
-    writeMessage.start("REQUEST_ID")
+    writeMessage.start(clientID, sessionID, "REQUEST_ID")
 
     sendMessage
 
@@ -196,7 +199,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def clientInfo(numWorkers: Short, logDir: String): this.type = {
 
-    writeMessage.start("CLIENT_INFO")
+    writeMessage.start(clientID, sessionID, "CLIENT_INFO")
     writeMessage.writeShort(numWorkers)
     writeMessage.writeString(logDir)
 
@@ -211,7 +214,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def sendTestString(testString: String): String = {
 
-    writeMessage.start("SEND_TEST_STRING")
+    writeMessage.start(clientID, sessionID, "SEND_TEST_STRING")
     writeMessage.writeString(testString)
 
     sendMessage
@@ -227,7 +230,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def requestTestString: String = {
 
-    writeMessage.start("REQUEST_TEST_STRING")
+    writeMessage.start(clientID, sessionID, "REQUEST_TEST_STRING")
 
     sendMessage
 
@@ -244,7 +247,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
     println(s"Requesting $numWorkers Alchemist workers")
 
-    writeMessage.start("REQUEST_WORKERS")
+    writeMessage.start(clientID, sessionID, "REQUEST_WORKERS")
     writeMessage.writeShort(numWorkers)
 
     sendMessage
@@ -275,7 +278,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
     println(s"Yielding Alchemist workers")
 
-    writeMessage.start("YIELD_WORKERS")
+    writeMessage.start(clientID, sessionID, "YIELD_WORKERS")
 
     sendMessage
 
@@ -288,7 +291,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def sendMatrixInfo(numRows: Long, numCols: Long): MatrixHandle = {
 
-    writeMessage.start("MATRIX_INFO")
+    writeMessage.start(clientID, sessionID, "MATRIX_INFO")
     writeMessage.writeByte(0)        // Type: dense
     writeMessage.writeByte(0)        // Layout: by rows (default)
     writeMessage.writeLong(numRows)         // Number of rows
@@ -311,77 +314,77 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def sendAssignedWorkersInfo: this.type = {
 
-    writeMessage.start("SEND_ASSIGNED_WORKERS_INFO")
+    writeMessage.start(clientID, sessionID, "SEND_ASSIGNED_WORKERS_INFO")
 
     sendMessage
   }
 
   def listAllWorkers: this.type = {
 
-    writeMessage.start("LIST_ALL_WORKERS")
+    writeMessage.start(clientID, sessionID, "LIST_ALL_WORKERS")
 
     sendMessage
   }
 
   def listActiveWorkers: this.type = {
 
-    writeMessage.start("LIST_ACTIVE_WORKERS")
+    writeMessage.start(clientID, sessionID, "LIST_ACTIVE_WORKERS")
 
     sendMessage
   }
 
   def listInactiveWorkers: this.type = {
 
-    writeMessage.start("LIST_INACTIVE_WORKERS")
+    writeMessage.start(clientID, sessionID, "LIST_INACTIVE_WORKERS")
 
     sendMessage
   }
 
   def listAssignedWorkers: this.type = {
 
-    writeMessage.start("LIST_ASSIGNED_WORKERS")
+    writeMessage.start(clientID, sessionID, "LIST_ASSIGNED_WORKERS")
 
     sendMessage
   }
 
   def loadLibrary: this.type = {
 
-    writeMessage.start("LOAD_LIBRARY")
+    writeMessage.start(clientID, sessionID, "LOAD_LIBRARY")
 
     sendMessage
   }
 
   def runTask: this.type = {
 
-    writeMessage.start("RUN_TASK")
+    writeMessage.start(clientID, sessionID, "RUN_TASK")
 
     sendMessage
   }
 
   def unloadLibrary: this.type = {
 
-    writeMessage.start("UNLOAD_LIBRARY")
+    writeMessage.start(clientID, sessionID, "UNLOAD_LIBRARY")
 
     sendMessage
   }
 
   def matrixInfo: this.type = {
 
-    writeMessage.start("MATRIX_INFO")
+    writeMessage.start(clientID, sessionID, "MATRIX_INFO")
 
     sendMessage
   }
 
   def matrixLayout: this.type = {
 
-    writeMessage.start("MATRIX_LAYOUT")
+    writeMessage.start(clientID, sessionID, "MATRIX_LAYOUT")
 
     sendMessage
   }
 
   def matrixBlock: this.type = {
 
-    writeMessage.start("MATRIX_BLOCK")
+    writeMessage.start(clientID, sessionID, "MATRIX_BLOCK")
 
     sendMessage
   }

@@ -38,6 +38,9 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
   val writeMessage = new Message
   val readMessage = new Message
 
+  var clientID: Short = 0
+  var sessionID: Short = 0
+
 //  val sock = java.nio.channels.SocketChannel.open(new java.net.InetSocketAddress(address, port))
 //  println(s"Connected to $hostname at $address:$port")
 //  var outbuf: ByteBuffer = null
@@ -70,10 +73,10 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
 
     val in = sock.getInputStream
 
-    val header: Array[Byte] = Array.fill[Byte](5)(0)
+    val header: Array[Byte] = Array.fill[Byte](9)(0)
     val packet: Array[Byte] = Array.fill[Byte](8192)(0)
 
-    in.read(header, 0, 5)
+    in.read(header, 0, 9)
 
     readMessage.reset
     readMessage.addHeader(header)
@@ -96,7 +99,7 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
 
   def handshake: Boolean = {
 
-    writeMessage.start("HANDSHAKE")
+    writeMessage.start(0, 0, "HANDSHAKE")
 
     writeMessage.writeByte(2)
     writeMessage.writeShort(1234)
@@ -109,7 +112,8 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
     if (readMessage.readCommandCode == 1) {
       if (readMessage.readShort == 4321) {
         if (readMessage.readString == "DCBA") {
-          handshakeSuccess = true
+          clientID = readMessage.readClientID
+          sessionID = readMessage.readSessionID
         }
       }
     }
@@ -118,7 +122,7 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
   }
 
   def startSendMatrixBlocks(id: Short): this.type = {
-    writeMessage.start("SEND_MATRIX_BLOCKS")
+    writeMessage.start(clientID, sessionID, "SEND_MATRIX_BLOCKS")
     writeMessage.writeShort(id)
 
     this
@@ -139,7 +143,7 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
   }
 
   def startRequestMatrixBlocks(id: Short): this.type = {
-    writeMessage.start("REQUEST_MATRIX_BLOCKS")
+    writeMessage.start(clientID, sessionID, "REQUEST_MATRIX_BLOCKS")
     writeMessage.writeShort(id)
 
     this
