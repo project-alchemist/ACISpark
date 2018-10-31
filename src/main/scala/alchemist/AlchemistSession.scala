@@ -2,32 +2,42 @@ package alchemist
 
 import scala.io.Source
 import alchemist.io._
+import org.apache.spark.mllib.linalg.distributed.IndexedRow
+
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.Map
+import scala.collection.immutable.Seq
+import scala.util.Random
 
 // spark-core
+import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
 // spark-sql
 import org.apache.spark.sql.SparkSession
 // spark-mllib
+import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix, RowMatrix}
 import scala.math.max
 
-class AlchemistContext(client: DriverSession) extends Serializable {
-  
-  val workerIds: Array[WorkerId] = client.workerIds
-  val workerInfo: Array[WorkerInfo] = client.workerInfo
-
-  def connectWorker(worker: WorkerId): WorkerClient = workerInfo(worker.id).connect
-}
+//class AlchemistContext(client: DriverSession) extends Serializable {
+//
+////  val workerIds: Array[WorkerId] = client.workerIds
+////  val workerInfo: Array[WorkerInfo] = client.workerInfo
+//
+//  def connectWorker(worker: WorkerId): WorkerClient = workerInfo(worker.id).connect
+//}
 
 object AlchemistSession {
   println("Launching Alchemist")
-  
-  var driver: Driver = new Driver()
+
 
   var connected: Boolean = false
-  
+
+  var driverClient: DriverClient = _
+  var workerClients: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
+
   def main(args: Array[String]) {
 
     initialize
@@ -41,6 +51,19 @@ object AlchemistSession {
     requestWorkers(2)
 
     stop
+  }
+
+  def createRandomRDD(nRows: Int, nCols: Int, ss: SparkSession): RDD[Array[Array[Double]]] = {
+    val randomArray = Array.ofDim[Double](nRows,nCols)
+
+    val rnd = new Random(123)
+
+    for {
+      i <- 0 until 20
+      j <- 0 until 10
+    } randomArray(i)(j) = rnd.nextGaussian()
+
+    ss.sparkContext.parallelize(Seq(randomArray))
   }
 
 //  var client: DriverClient = _
@@ -60,6 +83,8 @@ object AlchemistSession {
 //
   def initialize(): this.type = {
 
+    driverClient = new DriverClient()
+
 //    client = driver.client
 
     // Instances of `Alchemist` are not serializable, but `.context` has everything needed for RDD operations
@@ -70,99 +95,119 @@ object AlchemistSession {
   }
 
   def connect(address: String, port: Int): Boolean = {
-    driver.connect(address, port)
+
+    driverClient.connect(address, port)
   }
 
   def requestWorkers(numWorkers: Short): this.type = {
-    driver.requestWorkers(numWorkers)
+
+    workerClients = driverClient.requestWorkers(numWorkers)
+
+    if (workerClients.isEmpty)
+      println(s"Alchemist could not assign $numWorkers workers")
 
     this
   }
 
   def yieldWorkers(): this.type = {
 
-    driver.yieldWorkers
+    driverClient.yieldWorkers
 
     this
   }
 
-  def getMatrixHandle(mat: IndexedRowMatrix): MatrixHandle = {
+  def getMatrixHandle(mat: IndexedRowMatrix): MatrixHandle = driverClient.sendMatrixInfo(mat.numRows, mat.numCols)
 
-    val mh: MatrixHandle = driver.sendMatrixInfo(mat.numRows, mat.numCols)
+  def sendIndexedRowMatrix(mat: IndexedRowMatrix): MatrixHandle = {
 
-//    val workerAssignments: collection.mutable.Map[Short, Array[Long]] = _
+    val mh = getMatrixHandle(mat)
 
+    mat.rows.mapPartitionsWithIndex { (idx, part) =>
+      val rows = part.toArray
 
+      var connected: Int = 0
+      var workers: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
 
-//    mat.rows.mapPartitionsWithIndex { (id, part) =>
-//      val localRows = part.toArray
-//      val relevantWorkers = localRows.map(row => mh.layout(row.index.toInt)).distinct.map(id => new WorkerId(id))
-//      println("Sending data to following workers: ")
-//      println(relevantWorkers.map(node => node.id.toString).mkString(" "))
-//      val maxWorkerId = relevantWorkers.map(node => node.id).max
-//      var nodeClients = Array.fill(maxWorkerId+1)(None: Option[WorkerClient])
-//      System.err.println(s"Connecting to ${relevantWorkers.length} workers")
-//      relevantWorkers.foreach(node => nodeClients(node.id) = Some(ctx.connectWorker(node)))
-//      System.err.println(s"Successfully connected to all workers; have ${rows.length} rows to send")
-//    }
+      workerClients.foreach(w => workers += (w._1 -> new WorkerClient(w._1, w._2.hostname, w._2.address, w._2.port)))
+
+      workers.foreach(w => {
+        if (w._2.connect()) connected += 1
+      })
+
+      if (connected == workers.size) {
+        workers.foreach(w => w._2.startSendMatrixBlocks(mh.id))
+
+        rows.foreach(row => {
+          lazy val elements = row.vector.toArray
+          val index: Long = row.index
+          workers(mh.rowLayout(index.toInt)).addSendMatrixBlock(Array(index,index,0,elements.length-1), elements)
+        })
+
+        workers.foreach(w => w._2.finishSendMatrixBlocks.disconnectFromAlchemist)
+      }
+
+      part
+    }.count
 
     mh
   }
 
-  def getMatrixHandle(mat: RowMatrix): MatrixHandle = {
+  def getIndexedRowMatrix(mh: MatrixHandle, sc: SparkContext): IndexedRowMatrix = {
 
-    driver.sendMatrixInfo(mat.numRows, mat.numCols)
+    val layout: RDD[IndexedRow] = sc.parallelize(
+      (0l until mh.numRows).map(i => {
+        new IndexedRow(i, new DenseVector(new Array[Double](1)))
+      }), sc.defaultParallelism)
+
+    val indexedRows: RDD[IndexedRow] = layout.mapPartitionsWithIndex({ (idx, part) =>
+      val rows = part.toArray
+
+      var connected: Int = 0
+      var workers: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
+
+      workerClients.foreach(w => workers += (w._1 -> new WorkerClient(w._1, w._2.hostname, w._2.address, w._2.port)))
+
+      workers.foreach(w => {
+        if (w._2.connect()) connected += 1
+      })
+
+      var currentRowIter: Iterator[IndexedRow] = rows.map(row => new IndexedRow(row.index, row.vector)).iterator
+
+      if (connected == workers.size) {
+        workers.foreach(w => w._2.startRequestMatrixBlocks(mh.id))
+
+        rows.foreach(row => {
+          val index: Long = row.index
+          workers(mh.rowLayout(index.toInt)).addRequestedMatrixBlock(Array(index,index,0,mh.numCols-1))
+        })
+
+        workers.foreach(w => w._2.finishRequestMatrixBlocks)
+
+        currentRowIter = rows.map(row => {
+          val index: Long = row.index
+          new IndexedRow(index, workers(mh.rowLayout(index.toInt)).getRequestedMatrixBlock(Array(index,index,0,mh.numCols-1)))
+        }).iterator
+
+        workers.foreach(w => w._2.disconnectFromAlchemist)
+      }
+
+      currentRowIter
+    }, preservesPartitioning = true)
+
+    new IndexedRowMatrix(indexedRows, mh.numRows, mh.numCols.toInt)
   }
+
+  def sendRowMatrix(mat: RowMatrix): MatrixHandle = getMatrixHandle(mat)
+
+  def getMatrixHandle(mat: RowMatrix): MatrixHandle = driverClient.sendMatrixInfo(mat.numRows, mat.numCols)
 
   def stop(): this.type = {
 
     yieldWorkers
     println("Ending Alchemist session")
-  }
 
-//  def getMatrixHandle(mat: IndexedRowMatrix): MatrixHandle = {
-//    val workerIds = context.workerIds
-//    // rowWorkerAssignments is an array of WorkerIds whose ith entry is the world rank of the alchemist worker
-//    // that will take the ith row (ranging from 0 to numworkers-1). Note 0 is an executor, not the driver
-//    try {
-//      val (handle, rowWorkerAssignments) = client.sendNewMatrix(mat.numRows, mat.numCols)
-//
-//      mat.rows.mapPartitionsWithIndex { (idx, part) =>
-//        val rows = part.toArray
-//        val relevantWorkers = rows.map(row => rowWorkerAssignments(row.index.toInt).id).distinct.map(id => new WorkerId(id))
-//        val maxWorkerId = relevantWorkers.map(node => node.id).max
-//        var nodeClients = Array.fill(maxWorkerId+1)(None: Option[WorkerClient])
-//        System.err.println(s"Connecting to ${relevantWorkers.length} workers")
-//        relevantWorkers.foreach(node => nodeClients(node.id) = Some(context.connectWorker(node)))
-//        System.err.println(s"Successfully connected to all workers")
-//
-//        // TODO: randomize the order the rows are sent in to avoid queuing issues?
-//        var count = 0
-//        rows.foreach{ row =>
-//          count += 1
-//  //        System.err.println(s"Sending row ${row.index.toInt}, ${count} of ${rows.length}")
-//          nodeClients(rowWorkerAssignments(row.index.toInt).id).get.
-//            newMatrixAddRow(handle, row.index, row.vector.toArray)
-//        }
-//        System.err.println("Finished sending rows")
-//        nodeClients.foreach(client =>
-//            if (client.isDefined) {
-//              client.get.newMatrixPartitionComplete(handle)
-//              client.get.close()
-//            })
-//        Iterator.single(true)
-//      }.count
-//
-//      client.sendNewMatrixDone()
-//
-//      handle
-//    }
-//    catch {
-//      case protocol: ProtocolException => System.err.println("Protocol Exception in 'Alchemist.getMatrixHandle'")
-//      stop()
-//      new MatrixHandle(0)
-//    }
-//  }
+    this
+  }
 
   //  def setSparkContext(_sc: SparkContext) {
   //    sc = _sc

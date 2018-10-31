@@ -28,8 +28,8 @@ class DriverSession(val istream: InputStream, val ostream: OutputStream) {
   val output = new DataOutputStream(ostream)
   
   var workerCount: Int = 0
-  var workerIds: Array[WorkerId] = _
-  var workerInfo: Array[WorkerInfo] = _
+//  var workerIds: Array[WorkerId] = _
+//  var workerInfo: Array[WorkerInfo] = _
 
 //  def handshake(): this.type = {
 //    output.sendInt(0x0)

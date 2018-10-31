@@ -1,15 +1,16 @@
 package alchemist
 
 import scala.collection.JavaConverters._
+import scala.collection.Map
 import scala.util.Random
+
 import java.net.Socket
-import java.nio.{ByteOrder, ByteBuffer}
-import java.util._
+import java.nio.{ByteBuffer, ByteOrder}
+import java.util.{Collections, Arrays}
 import java.io.{BufferedReader, FileInputStream, InputStream, InputStreamReader, OutputStream, PrintWriter, DataInputStream => JDataInputStream, DataOutputStream => JDataOutputStream}
 
 import scala.io.Source
 import org.apache.spark.sql.SparkSession
-
 import java.nio.file.{Files, Paths}
 import java.nio.charset.StandardCharsets
 
@@ -17,7 +18,7 @@ import scala.compat.Platform.EOL
 import alchemist._
 
 
-class Driver {
+class DriverClient {          // Connects to the Alchemist driver
   
   var address: String = _
   var port: Int = _
@@ -33,8 +34,8 @@ class Driver {
   val writeMessage = new Message
   val readMessage = new Message
 
-  var workerInfo: Array[WorkerInfo] = Array.empty[WorkerInfo]
-  var workerClients: Array[WorkerClient] = Array.empty[WorkerClient]
+//  var workerInfo: Array[WorkerInfo] = Array.empty[WorkerInfo]
+
     
 //  val driverSock = listenSock.accept()
 //  System.err.println(s"Alchemist.Driver: Accepting connection from Alchemist driver on socket")
@@ -57,6 +58,7 @@ class Driver {
   }
 
   def connect: Boolean = {
+
     val pb = {
       try {
         val fstream: FileInputStream  = new FileInputStream("connection.info")
@@ -238,7 +240,7 @@ class Driver {
     testString
   }
 
-  def requestWorkers(numWorkers: Short): this.type = {
+  def requestWorkers(numWorkers: Short): Map[Short, WorkerClient] = {
 
     println(s"Requesting $numWorkers Alchemist workers")
 
@@ -249,14 +251,24 @@ class Driver {
 
     val numAssignedWorkers: Short = readMessage.readShort()
 
-    if (numAssignedWorkers > 0) {
-      workerInfo = (0 until numAssignedWorkers).map(_ => new WorkerInfo(readMessage.readShort(), readMessage.readString(), readMessage.readString(), readMessage.readShort())).toArray
-    }
-    else {
-      println(s"Alchemist could not assign $numWorkers workers")
-    }
 
-    connectToWorkers
+//    var workerClients: Array[WorkerClient] = Array.empty[WorkerClient]
+//
+//    if (numAssignedWorkers > 0) {
+//      workerClients =
+//    }
+//    else {
+//
+//    }
+
+    var workers: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
+
+    (0 until numAssignedWorkers).foreach(_ => {
+      val ID = readMessage.readShort()
+      workers += (ID -> new WorkerClient(ID, readMessage.readString(), readMessage.readString(), readMessage.readShort()))
+    })
+
+    workers
   }
 
   def yieldWorkers: this.type = {
@@ -285,9 +297,9 @@ class Driver {
     sendMessage
 
     val matrixID: Short = readMessage.readShort
-    val matrixLayout: Array[Short] = extractLayout
+    val rowLayout: Array[Short] = extractLayout
 
-    new MatrixHandle(matrixID, numRows, numCols, matrixLayout)
+    new MatrixHandle(matrixID, numRows, numCols).setRowLayout(rowLayout)
   }
 
   def extractLayout: Array[Short] = {
@@ -295,13 +307,6 @@ class Driver {
     val numRows: Long = readMessage.readLong
 
     (0l until numRows).map(_ => readMessage.readShort).toArray
-  }
-
-  def connectToWorkers: this.type = {
-
-    workerClients = workerInfo.map(w => w.connect())
-
-    this
   }
 
   def sendAssignedWorkersInfo: this.type = {
@@ -383,7 +388,7 @@ class Driver {
 
   def disconnectFromAlchemist: this.type = {
     println(s"Disconnecting from Alchemist")
-
+    sock.close()
     this
   }
 

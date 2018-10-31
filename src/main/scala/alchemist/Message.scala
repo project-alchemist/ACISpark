@@ -6,225 +6,13 @@ import java.nio.charset.Charset
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.{Arrays, Collections}
 
-// import alchemist.io.{DataInputStream, DataOutputStream}
-
-//class inputMessage(val istream: InputStream) {
-//
-//  val headerLength: Int = 5
-//  val maxBodyLength: Int = 1048576        // Message length in bytes
-//
-//  val input = new DataInputStream(istream)
-//
-//  val stream: ByteArrayOutputStream = new ByteArrayOutputStream()
-//  val oos = new ObjectOutputStream(stream)
-//
-//  var commandCode: Byte = AlchemistCommand.getCode("WAIT")
-//  var bodyLength: Int = 0
-//  var readIndex: Int = 0
-//
-//  var tempBytes: Array[Byte] = new Array[Byte](1024)
-//
-//  // For writing data
-//  var currentDataType = DataType.getCode("NONE")
-//  var currentLengthPos: Int = 0
-//
-//  // Methods
-//
-//  def getMaxBodyLength: Int = maxBodyLength
-//
-//  def getLength: Int = bodyLength + readIndex
-//
-//  def decodeHeader = {
-//    input.read(tempBytes, 0, 1)
-//    commandCode = tempBytes(0)
-//    input.read(tempBytes, 1, 4)
-//    bodyLength = deserializeInt(tempBytes)
-//  }
-//
-//  def getCommandCode: Byte = commandCode
-//
-//  def getBodyLength: Int = bodyLength
-//
-//  def deserializeChar(bytes: Array[Byte]): Char = {
-//    val ois = new ObjectInputStream(new ByteArrayInputStream(bytes))
-//    val value = ois.readChar
-//    ois.close
-//    value
-//  }
-//
-//  def deserializeInt(bytes: Array[Byte]): Int = {
-//    val ois = new ObjectInputStream(new ByteArrayInputStream(bytes))
-//    val value = ois.readInt
-//    ois.close
-//    value
-//  }
-//
-//  def print: this.type = {
-//
-//    val space: String = "                                              "
-//    var data: String = ""
-//
-//    val tt = outputBuffer.array
-//
-//    val tempCommandCode = tt(0)
-//    val tempBodyLength = ByteBuffer.wrap(tt.slice(1, 5)).getInt
-//
-//    System.out.println()
-//    System.out.println(s"$space ==============================================")
-//    System.out.println(s"$space Command code:        $tempCommandCode")
-//    System.out.println(s"$space Message body length: $tempBodyLength")
-//    System.out.println(s"$space ----------------------------------------------")
-//
-//    var i: Int = headerLength
-//
-//    var ii = 0
-//    for (ii <- 0 to 22)
-//      println(tt(ii))
-//
-//    while (i < tempBodyLength) {
-//
-//      val dataArrayType: String = DataType.getName(tt(i))
-//      val dataArrayLength: Int = ByteBuffer.wrap(tt.slice(i + 1, i + 5)).getInt
-//
-//      System.out.println(s"$space Datatype (length):    $dataArrayType ($dataArrayLength)")
-//
-//      data = ""
-//      i += 5
-//
-//      if (dataArrayType == "STRING") {
-//        val string: Array[Char] = new Array[Char](dataArrayLength)
-//
-//        //        data = new String(ByteBuffer.wrap(tt.slice(i, i + dataArrayLength)).order(ByteOrder.LITTLE_ENDIAN).getChar, Charset.forName("UTF-8"))
-//        i += dataArrayLength
-//      }
-//      else {
-//        var dataTypeLength: Int = 0
-//        dataArrayType match {
-//          case "BYTE" => dataTypeLength = 1
-//          case "CHAR" => dataTypeLength = 2
-//          case "SHORT" => dataTypeLength = 2
-//          case "INT" => dataTypeLength = 4
-//          case "LONG" => dataTypeLength = 8
-//          case "FLOAT" => dataTypeLength = 4
-//          case "DOUBLE" => dataTypeLength = 8
-//        }
-//
-//        var j = 0
-//        for (j <- 0 until dataArrayLength) {
-//          dataArrayType match {
-//            case "BYTE" => data = data.concat(s" ${tt(i)}")
-//            case "CHAR" => data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + dataTypeLength)).getChar}")
-//            case "SHORT" => data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + dataTypeLength)).getShort}")
-//            case "INT" => data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + dataTypeLength)).getInt}")
-//            case "LONG" => data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + dataTypeLength)).getLong}")
-//            case "FLOAT" => data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + dataTypeLength)).getFloat}")
-//            case "DOUBLE" => data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + dataTypeLength)).getDouble}")
-//          }
-//
-//          i += dataTypeLength
-//        }
-//      }
-//      System.out.println(s"$space Data:                 $data")
-//    }
-//
-//    System.out.println(s"$space ==============================================")
-//
-//    this
-//  }
-//}
-//
-//
-//class outputMessage(val output: OutputStream) {
-//
-//  val headerLength: Int = 5
-//  val maxBodyLength: Int = 1048576
-//
-//  val outputBuffer = ByteBuffer.allocate(headerLength + maxBodyLength)
-//  val tempBuffer = ByteBuffer.allocate(8)
-//
-//  val stream: ByteArrayOutputStream = new ByteArrayOutputStream()
-//  val oos = new ObjectOutputStream(stream)
-//
-//  var commandCode: Byte = AlchemistCommand.getCode("WAIT")
-//  var bodyLength: Int = 0
-//
-//  var tempBytes: Array[Byte] = new Array[Byte](8)
-//
-//  // For writing data
-//  var currentDataType: Byte = DataType.getCode("NONE")
-//  var currentDataTypeCount: Int = 0
-//  var currentLengthPos: Int = headerLength
-//
-//  // Methods
-//
-//  def getMaxBodyLength: Int = maxBodyLength
-//
-//  def getCommandCode: Byte = commandCode
-//
-//  def getBodyLength: Int = bodyLength
-//
-//  def start(cc: String): this.type = {
-//    this.writeCommandCode(cc).writeBodyLength(0)
-//  }
-//
-//  def writeCommandCode(v: String): this.type = {
-//    outputBuffer.put(AlchemistCommand.getCode(v))
-//
-//    this
-//  }
-//
-//  def writeBodyLength(bl: Int): this.type = {
-//    outputBuffer.putInt(bl)
-//
-//    this
-//  }
-//
-//  def updateBodyLength(): this.type = {
-//
-//    tempBuffer.clear
-//    tempBuffer.putInt(bodyLength)
-//
-//    val bbArray = tempBuffer.array
-//    for (i <- 0 until 4) {
-//      outputBuffer.put(1 + i, bbArray(i))
-//    }
-//
-//    this
-//  }
-//
-////  def updateDataType: this.type = {
-////
-////    if (currentDataType > 0 && currentLengthPos > headerLength)
-////      putInt(currentDataTypeCount, currentLengthPos)
-////
-////    this
-////  }
-//
-//  def flush: this.type = {
-//    updateBodyLength.updateDatatype
-//
-//    if (outputBuffer.hasArray) {
-//      val array = outputBuffer.array.slice(0, headerLength + bodyLength)
-//      Collections.reverse(Arrays.asList(array))
-//      output.write(array)
-//    }
-//    else {
-//      System.out.println("Ooops")
-//    }
-//
-//    output.flush
-//
-//    this
-//  }
-//}
-
 object Commands {
   val commands = Map[String, Byte]("WAIT" -> 0, "HANDSHAKE" -> 1, "REQUEST_ID" -> 2, "CLIENT_INFO" -> 3,
     "SEND_TEST_STRING" -> 4, "REQUEST_TEST_STRING" -> 5, "REQUEST_WORKERS" -> 6, "YIELD_WORKERS" -> 7,
     "SEND_ASSIGNED_WORKERS_INFO" -> 8, "LIST_ALL_WORKERS" -> 9, "LIST_ACTIVE_WORKERS" -> 10,
     "LIST_INACTIVE_WORKERS" -> 11, "LIST_ASSIGNED_WORKERS" -> 12, "LOAD_LIBRARY" -> 13, "RUN_TASK" -> 14,
     "UNLOAD_LIBRARY" -> 15, "MATRIX_INFO" -> 16, "MATRIX_LAYOUT" -> 17,
-    "MATRIX_BLOCK" -> 18, "SHUT_DOWN" -> 19)
+    "SEND_MATRIX_BLOCKS" -> 18, "REQUEST_MATRIX_BLOCKS" -> 19, "SHUT_DOWN" -> 20)
 
   def getName(v: Byte): String = commands.find(_._2 == v).map(_._1).get
 
@@ -242,12 +30,14 @@ object Datatypes {
 
 class Message() {
 
-  val headerLength: Byte = 5
-  var maxBodyLength: Int = 1000000
+  val headerLength: Byte = 9
+  var maxBodyLength: Int = 10000000
 
   val messageBuffer = ByteBuffer.allocate(headerLength + maxBodyLength).order(ByteOrder.BIG_ENDIAN)
   val tempBuffer = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN)
 
+  var clientID: Short = 0
+  var sessionID: Short = 0
   var commandCode: Byte = Commands.getCode("WAIT")
   var bodyLength: Int = 0
 
@@ -277,15 +67,25 @@ class Message() {
   }
 
   // Reading data
+  def readClientID(): Short = {
+    ByteBuffer.wrap(messageBuffer.array.slice(0, 2)).order(ByteOrder.BIG_ENDIAN).getShort
+  }
+
+  def readSessionID(): Short = {
+    ByteBuffer.wrap(messageBuffer.array.slice(2, 4)).order(ByteOrder.BIG_ENDIAN).getShort
+  }
+
   def readCommandCode(): Byte = {
-    messageBuffer.get(0)
+    messageBuffer.get(4)
   }
 
   def readBodyLength(): Int = {
-    ByteBuffer.wrap(messageBuffer.array.slice(1, 5)).order(ByteOrder.BIG_ENDIAN).getInt
+    ByteBuffer.wrap(messageBuffer.array.slice(5, 9)).order(ByteOrder.BIG_ENDIAN).getInt
   }
 
   def readHeader(): this.type = {
+    clientID = readClientID
+    sessionID = readSessionID
     commandCode = readCommandCode
     bodyLength = readBodyLength
     readPos = headerLength
@@ -385,6 +185,23 @@ class Message() {
     ByteBuffer.wrap(messageBuffer.array.slice(readPos - 8, readPos)).order(ByteOrder.BIG_ENDIAN).getDouble
   }
 
+  def readDouble(num: Int): Array[Double] = {
+    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) {
+      readNextDatatype
+    }
+
+    readPos += 8*num
+    currentDatatypeCount += num
+    val vec = new Array[Double](num)
+
+    ByteBuffer.wrap(messageBuffer.array.slice(readPos - 8*num, readPos))
+        .order(ByteOrder.BIG_ENDIAN)
+        .asDoubleBuffer()
+        .get(vec)
+
+    vec
+  }
+
   def readString(): String = {
 
     if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) {
@@ -397,17 +214,33 @@ class Message() {
   }
 
   // Writing data
-  def start(s: String): this.type = {
+  def start(client_id: Short, session_id: Short, s: String): this.type = {
 
     reset
-    messageBuffer.put(0, Commands.getCode(s))
+    tempBuffer.clear
+    tempBuffer.putShort(client_id)
+
+    var bbArray = tempBuffer.array
+    for (i <- 0 until 2) {
+      messageBuffer.put(i, bbArray(i))
+    }
+
+    tempBuffer.clear
+    tempBuffer.putShort(client_id)
+
+    bbArray = tempBuffer.array
+    for (i <- 0 until 2) {
+      messageBuffer.put(i + 2, bbArray(i))
+    }
+
+    messageBuffer.put(4, Commands.getCode(s))
 
     this
   }
 
   def addHeader(header: Array[Byte]): this.type = {
 
-    for (i <- 0 until 5)
+    for (i <- 0 until 9)
       messageBuffer.put(i, header(i))
     readHeader()
 
@@ -610,7 +443,7 @@ class Message() {
 
     val bbArray = tempBuffer.array
     for (i <- 0 until 4) {
-      messageBuffer.put(i + 1, bbArray(i))
+      messageBuffer.put(i + 5, bbArray(i))
     }
 
     this
