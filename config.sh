@@ -2,7 +2,7 @@
 
 # Configuration file for building Alchemist-Spark Interface
 
-if [ "$SYSTEM" = ""]; then
+if [ "$SYSTEM" = "" ]; then
   export SYSTEM="MacOS"                # Options: MacOS, Cori, <add your own>
 fi
 
