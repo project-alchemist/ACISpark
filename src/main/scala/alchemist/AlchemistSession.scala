@@ -21,13 +21,6 @@ import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix, RowMatrix}
 import scala.math.max
 
-//class AlchemistContext(client: DriverSession) extends Serializable {
-//
-////  val workerIds: Array[WorkerId] = client.workerIds
-////  val workerInfo: Array[WorkerInfo] = client.workerInfo
-//
-//  def connectWorker(worker: WorkerId): WorkerClient = workerInfo(worker.id).connect
-//}
 
 object AlchemistSession {
   println("Launching Alchemist")
@@ -41,12 +34,12 @@ object AlchemistSession {
   def main(args: Array[String]) {
 
     initialize
-    connected = connect("0.0.0.0", 24960)
-    if (connected) {
-      println("Connected to Alchemist")
-    } else {
-      println("Unable to connect to Alchemist")
-    }
+    connect("0.0.0.0", 24960)
+//    if (connected) {
+//      println("Connected to Alchemist")
+//    } else {
+//      println("Unable to connect to Alchemist")
+//    }
 
     requestWorkers(2)
 
@@ -66,21 +59,6 @@ object AlchemistSession {
     ss.sparkContext.parallelize(Seq(randomArray))
   }
 
-//  var client: DriverClient = _
-//
-//  var sc: SparkContext = _
-//
-//  var context: AlchemistContext = _
-//
-//  val libraries = collection.mutable.Map[String, String]()
-//
-//  def registerLibrary(libraryInfo: (String, String)) {
-//    libraries.update(libraryInfo._1, libraryInfo._2)
-//    client.loadLibrary(libraryInfo._1, libraryInfo._2)
-//  }
-//
-//  def listLibraries(): Unit = libraries foreach (x => println (x._1 + "-->" + x._2))
-//
   def initialize(): this.type = {
 
     driverClient = new DriverClient()
@@ -94,9 +72,16 @@ object AlchemistSession {
     this
   }
 
-  def connect(address: String, port: Int): Boolean = {
+  def loadLibrary(name: String): String = {
+    println(s"Loading library $name")
+    return name
+  }
+
+  def connect(address: String, port: Int): this.type = {
 
     driverClient.connect(address, port)
+
+    this
   }
 
   def requestWorkers(numWorkers: Short): this.type = {
@@ -114,6 +99,16 @@ object AlchemistSession {
     driverClient.yieldWorkers
 
     this
+  }
+
+  def runTask(libName: String, name: String, mh: MatrixHandle, rank: Int): (MatrixHandle, MatrixHandle, MatrixHandle) = {
+
+    println(s"Alchemist started task $name - please wait ...")
+//    start = time.time()
+    val (alU, alS, alV) = driverClient.truncatedSVD(libName, name, mh, rank)
+//    end = time.time()
+//    println(s"Elapsed time for truncated SVD is ${end - start}")
+    (alU, alS, alV)
   }
 
   def getMatrixHandle(mat: IndexedRowMatrix): MatrixHandle = driverClient.sendMatrixInfo(mat.numRows, mat.numCols)

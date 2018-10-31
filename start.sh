@@ -11,7 +11,7 @@ CURR_DIR=$PWD
 if [ "$SYSTEM" == "MacOS" ]
 then
 	# spark-shell --jars $ACISPARK_JAR
-	spark-submit --master local[3] --class alchemist.AlchemistSession $ACISPARK_JAR
+	spark-submit --master local[3] --class alchemist.TestSVD $ACISPARK_JAR
 	
 elif [ "$SYSTEM" == "Cori" ]
 then
