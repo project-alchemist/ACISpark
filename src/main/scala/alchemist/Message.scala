@@ -214,11 +214,11 @@ class Message() {
   }
 
   // Writing data
-  def start(client_id: Short, session_id: Short, s: String): this.type = {
+  def start(clientID: Short, sessionID: Short, s: String): this.type = {
 
     reset
     tempBuffer.clear
-    tempBuffer.putShort(client_id)
+    tempBuffer.putShort(clientID)
 
     var bbArray = tempBuffer.array
     for (i <- 0 until 2) {
@@ -226,7 +226,7 @@ class Message() {
     }
 
     tempBuffer.clear
-    tempBuffer.putShort(client_id)
+    tempBuffer.putShort(sessionID)
 
     bbArray = tempBuffer.array
     for (i <- 0 until 2) {
@@ -489,11 +489,15 @@ class Message() {
 
     val tt = messageBuffer.array
 
-    val tempCommandCode = tt(0)
-    val tempBodyLength: Int = ByteBuffer.wrap(tt.slice(1, 5)).order(ByteOrder.BIG_ENDIAN).getInt
+    val tempClientID: Short = ByteBuffer.wrap(tt.slice(0, 2)).order(ByteOrder.BIG_ENDIAN).getShort
+    val tempSessionID: Short = ByteBuffer.wrap(tt.slice(2, 4)).order(ByteOrder.BIG_ENDIAN).getShort
+    val tempCommandCode = tt(4)
+    val tempBodyLength: Int = ByteBuffer.wrap(tt.slice(5, 9)).order(ByteOrder.BIG_ENDIAN).getInt
 
     System.out.println()
     System.out.println(s"$space ==============================================")
+    System.out.println(s"$space Client ID:            $tempClientID")
+    System.out.println(s"$space Session ID:           $tempSessionID")
     System.out.println(s"$space Command code:         $tempCommandCode (${Commands.getName(tempCommandCode)})")
     System.out.println(s"$space Message body length:  $tempBodyLength")
     System.out.println(s"$space ----------------------------------------------")
