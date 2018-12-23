@@ -10,6 +10,10 @@ if [ "$SYSTEM" = "MacOS" ]
 then
 	export ACISPARK_PATH=$HOME/Projects/ACISpark
 	
+elif [ "$SYSTEM" = "Linux" ]
+then
+	export ACISPARK_PATH=$PWD
+	
 elif [ "$SYSTEM" = "Cori" ]
 then
 	export ACISPARK_PATH=$SCRATCH/Projects/ACISpark

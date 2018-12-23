@@ -8,10 +8,10 @@ echo $ACISPARK_JAR
 
 CURR_DIR=$PWD
 
-if [ "$SYSTEM" == "MacOS" ]
+if [ "$SYSTEM" == "MacOS" ] || [ "$SYSTEM" == "Linux" ]
 then
 	# spark-shell --jars $ACISPARK_JAR
-	spark-submit --master local[3] --class alchemist.TestSVD $ACISPARK_JAR
+	spark-submit --master local[3] --class alchemist.TestSvd $ACISPARK_JAR
 	
 elif [ "$SYSTEM" == "Cori" ]
 then
