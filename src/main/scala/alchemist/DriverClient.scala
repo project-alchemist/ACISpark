@@ -96,7 +96,7 @@ class DriverClient {          // Connects to the Alchemist driver
     val ar = writeMessage.finish()
     Collections.reverse(Arrays.asList(ar))
 
-    writeMessage.print
+//    writeMessage.print
 
     sock.getOutputStream.write(ar)
     sock.getOutputStream.flush
@@ -127,9 +127,44 @@ class DriverClient {          // Connects to the Alchemist driver
       readMessage.addPacket(packet, length)
     }
 
-    readMessage.print
+//    readMessage.print
 
     this
+  }
+
+  def truncatedSVD(lh: String, name: String, mh: MatrixHandle, rank: Int): (MatrixHandle, MatrixHandle, MatrixHandle) = {
+
+    val method: Byte = 0
+    writeMessage.start(clientID, sessionID, "RUN_TASK")
+    writeMessage.writeString(name)
+    writeMessage.writeShort(mh.id)
+    writeMessage.writeInt(rank)
+    writeMessage.writeByte(method)
+    sendMessage
+    receiveMessage
+
+    var matrixID = readMessage.readShort
+    var numRows = readMessage.readLong
+    var numCols = readMessage.readLong
+
+    val U: MatrixHandle = new MatrixHandle(matrixID, numRows, numCols)
+    U.rowLayout = extractLayout
+
+    matrixID = readMessage.readShort
+    numRows = readMessage.readLong
+    numCols = readMessage.readLong
+
+    val S: MatrixHandle = new MatrixHandle(matrixID, numRows, numCols)
+    S.rowLayout = extractLayout
+
+    matrixID = readMessage.readShort
+    numRows = readMessage.readLong
+    numCols = readMessage.readLong
+
+    val V: MatrixHandle = new MatrixHandle(matrixID, numRows, numCols)
+    V.rowLayout = extractLayout
+
+    (U, S, V)
   }
 
 //  def handleMessage: this.type = {
