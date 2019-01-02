@@ -7,12 +7,43 @@ import java.nio.{ByteBuffer, ByteOrder}
 import java.util.{Arrays, Collections}
 
 object Commands {
-  val commands = Map[String, Byte]("WAIT" -> 0, "HANDSHAKE" -> 1, "REQUEST_ID" -> 2, "CLIENT_INFO" -> 3,
-    "SEND_TEST_STRING" -> 4, "REQUEST_TEST_STRING" -> 5, "REQUEST_WORKERS" -> 6, "YIELD_WORKERS" -> 7,
-    "SEND_ASSIGNED_WORKERS_INFO" -> 8, "LIST_ALL_WORKERS" -> 9, "LIST_ACTIVE_WORKERS" -> 10,
-    "LIST_INACTIVE_WORKERS" -> 11, "LIST_ASSIGNED_WORKERS" -> 12, "LOAD_LIBRARY" -> 13, "RUN_TASK" -> 14,
-    "UNLOAD_LIBRARY" -> 15, "MATRIX_INFO" -> 16, "MATRIX_LAYOUT" -> 17,
-    "SEND_MATRIX_BLOCKS" -> 18, "REQUEST_MATRIX_BLOCKS" -> 19, "SHUT_DOWN" -> 20)
+  private val commands = Map[String, Byte](
+    "WAIT" -> 0,
+
+    // Connection
+    "HANDSHAKE" -> 1,
+    "REQUEST_ID" -> 2,
+    "CLIENT_INFO" -> 3,
+    "SEND_TEST_STRING" -> 4,
+    "REQUEST_TEST_STRING" -> 5,
+    "CLOSE_CONNECTION" -> 6,
+
+    // Workers
+    "REQUEST_WORKERS" -> 11,
+    "YIELD_WORKERS" -> 12,
+    "SEND_ASSIGNED_WORKERS_INFO" -> 13,
+    "LIST_ALL_WORKERS" -> 14,
+    "LIST_ACTIVE_WORKERS" -> 15,
+    "LIST_INACTIVE_WORKERS" -> 16,
+    "LIST_ASSIGNED_WORKERS" -> 17,
+
+    // Libraries
+    "LIST_AVAILABLE_LIBRARIES" -> 21,
+    "LOAD_LIBRARY" -> 22,
+    "UNLOAD_LIBRARY" -> 23,
+
+    // Matrices
+    "MATRIX_INFO" -> 31,
+    "MATRIX_LAYOUT" -> 32,
+    "SEND_MATRIX_BLOCKS" -> 33,
+    "REQUEST_MATRIX_BLOCKS" -> 34,
+
+    // Tasks
+    "RUN_TASK" -> 41,
+
+    // Shutting down
+    "SHUTDOWN" -> 99
+  )
 
   def getName(v: Byte): String = commands.find(_._2 == v).map(_._1).get
 
@@ -20,8 +51,18 @@ object Commands {
 }
 
 object Datatypes {
-  val datatypes = Map[String, Byte]("NONE" -> 0, "BYTE" -> 18, "SHORT" -> 34, "INT" -> 35,
-    "LONG" -> 36, "FLOAT" -> 15, "DOUBLE" -> 16, "CHAR" -> 5, "STRING" -> 47, "COMMAND_CODE" -> 47)
+  val datatypes = Map[String, Byte](
+    "NONE" -> 0,
+    "BYTE" -> 18,
+    "SHORT" -> 34,
+    "INT" -> 35,
+    "LONG" -> 36,
+    "FLOAT" -> 15,
+    "DOUBLE" -> 16,
+    "CHAR" -> 5,
+    "STRING" -> 47,
+    "COMMAND_CODE" -> 47
+  )
 
   def getName(v: Byte): String = datatypes.find(_._2 == v).map(_._1).get
 
