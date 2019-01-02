@@ -15,7 +15,7 @@ import java.nio.file.{Files, Paths}
 import java.nio.charset.StandardCharsets
 
 import scala.compat.Platform.EOL
-import alchemist._
+import alchemist.Command._
 
 
 class DriverClient {          // Connects to the Alchemist driver
@@ -135,7 +135,7 @@ class DriverClient {          // Connects to the Alchemist driver
   def truncatedSVD(lh: String, name: String, mh: MatrixHandle, rank: Int): (MatrixHandle, MatrixHandle, MatrixHandle) = {
 
     val method: Byte = 0
-    writeMessage.start(clientID, sessionID, "RUN_TASK")
+    writeMessage.start(clientID, sessionID, RunTask)
     writeMessage.writeString(name)
     writeMessage.writeShort(mh.id)
     writeMessage.writeInt(rank)
@@ -197,7 +197,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def handshake: Boolean = {
 
-    writeMessage.start(0, 0, "HANDSHAKE")
+    writeMessage.start(0, 0, Handshake)
 
     writeMessage.writeByte(2)
     writeMessage.writeShort(1234)
@@ -221,7 +221,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def requestID: this.type = {
 
-    writeMessage.start(clientID, sessionID, "REQUEST_ID")
+    writeMessage.start(clientID, sessionID, RequestId)
 
     sendMessage
 
@@ -234,7 +234,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def clientInfo(numWorkers: Short, logDir: String): this.type = {
 
-    writeMessage.start(clientID, sessionID, "CLIENT_INFO")
+    writeMessage.start(clientID, sessionID, ClientInfo)
     writeMessage.writeShort(numWorkers)
     writeMessage.writeString(logDir)
 
@@ -249,7 +249,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def sendTestString(testString: String): String = {
 
-    writeMessage.start(clientID, sessionID, "SEND_TEST_STRING")
+    writeMessage.start(clientID, sessionID, SendTestString)
     writeMessage.writeString(testString)
 
     sendMessage
@@ -265,7 +265,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def requestTestString: String = {
 
-    writeMessage.start(clientID, sessionID, "REQUEST_TEST_STRING")
+    writeMessage.start(clientID, sessionID, RequestTestString)
 
     sendMessage
 
@@ -282,7 +282,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
     println(s"Requesting $numWorkers Alchemist workers")
 
-    writeMessage.start(clientID, sessionID, "REQUEST_WORKERS")
+    writeMessage.start(clientID, sessionID, RequestWorkers)
     writeMessage.writeShort(numWorkers)
 
     sendMessage
@@ -313,7 +313,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
     println(s"Yielding Alchemist workers")
 
-    writeMessage.start(clientID, sessionID, "YIELD_WORKERS")
+    writeMessage.start(clientID, sessionID, YieldWorkers)
 
     sendMessage
 
@@ -326,7 +326,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def sendMatrixInfo(numRows: Long, numCols: Long): MatrixHandle = {
 
-    writeMessage.start(clientID, sessionID, "MATRIX_INFO")
+    writeMessage.start(clientID, sessionID, MatrixInfo)
     writeMessage.writeByte(0)        // Type: dense
     writeMessage.writeByte(0)        // Layout: by rows (default)
     writeMessage.writeLong(numRows)         // Number of rows
@@ -349,77 +349,77 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def sendAssignedWorkersInfo: this.type = {
 
-    writeMessage.start(clientID, sessionID, "SEND_ASSIGNED_WORKERS_INFO")
+    writeMessage.start(clientID, sessionID, SendAssignedWorkersInfo)
 
     sendMessage
   }
 
   def listAllWorkers: this.type = {
 
-    writeMessage.start(clientID, sessionID, "LIST_ALL_WORKERS")
+    writeMessage.start(clientID, sessionID, ListAllWorkers)
 
     sendMessage
   }
 
   def listActiveWorkers: this.type = {
 
-    writeMessage.start(clientID, sessionID, "LIST_ACTIVE_WORKERS")
+    writeMessage.start(clientID, sessionID, ListActiveWorkers)
 
     sendMessage
   }
 
   def listInactiveWorkers: this.type = {
 
-    writeMessage.start(clientID, sessionID, "LIST_INACTIVE_WORKERS")
+    writeMessage.start(clientID, sessionID, ListInactiveWorkers)
 
     sendMessage
   }
 
   def listAssignedWorkers: this.type = {
 
-    writeMessage.start(clientID, sessionID, "LIST_ASSIGNED_WORKERS")
+    writeMessage.start(clientID, sessionID, ListAssignedWorkers)
 
     sendMessage
   }
 
   def loadLibrary: this.type = {
 
-    writeMessage.start(clientID, sessionID, "LOAD_LIBRARY")
+    writeMessage.start(clientID, sessionID, LoadLibrary)
 
     sendMessage
   }
 
   def runTask: this.type = {
 
-    writeMessage.start(clientID, sessionID, "RUN_TASK")
+    writeMessage.start(clientID, sessionID, RunTask)
 
     sendMessage
   }
 
   def unloadLibrary: this.type = {
 
-    writeMessage.start(clientID, sessionID, "UNLOAD_LIBRARY")
+    writeMessage.start(clientID, sessionID, UnloadLibrary)
 
     sendMessage
   }
 
   def matrixInfo: this.type = {
 
-    writeMessage.start(clientID, sessionID, "MATRIX_INFO")
+    writeMessage.start(clientID, sessionID, MatrixInfo)
 
     sendMessage
   }
 
   def matrixLayout: this.type = {
 
-    writeMessage.start(clientID, sessionID, "MATRIX_LAYOUT")
+    writeMessage.start(clientID, sessionID, MatrixLayout)
 
     sendMessage
   }
 
   def matrixBlock: this.type = {
 
-    writeMessage.start(clientID, sessionID, "MATRIX_BLOCK")
+    writeMessage.start(clientID, sessionID, RequestMatrixBlocks) // TODO: Not sure which one this is.
 
     sendMessage
   }
