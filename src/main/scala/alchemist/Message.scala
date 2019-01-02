@@ -79,7 +79,7 @@ class Message() {
 
   var clientID: Short = 0
   var sessionID: Short = 0
-  var commandCode: Byte = Commands.getCode("WAIT")
+  var commandCode: Byte = Command.Wait.value
   var bodyLength: Int = 0
 
   // For writing data
@@ -88,12 +88,12 @@ class Message() {
   var currentDatatypeCountMax: Int = 0
   var currentDatatypeCountPos: Int = headerLength + 1
 
-  var readPos: Int = headerLength                // for reading data
-  var writePos: Int = headerLength               // for writing data
+  var readPos: Int = headerLength // for reading data
+  var writePos: Int = headerLength // for writing data
 
   def reset(): this.type = {
 
-    commandCode = Commands.getCode("WAIT")
+    commandCode = Command.Wait.value
     bodyLength = 0
 
     currentDatatype = Datatypes.getCode("NONE")
@@ -137,7 +137,7 @@ class Message() {
 
   def readNextDatatype(): this.type = {
     currentDatatype = messageBuffer.get(readPos)
-    currentDatatypeCountMax = ByteBuffer.wrap(messageBuffer.array.slice(readPos + 1, readPos+5)).order(ByteOrder.BIG_ENDIAN).getInt
+    currentDatatypeCountMax = ByteBuffer.wrap(messageBuffer.array.slice(readPos + 1, readPos + 5)).order(ByteOrder.BIG_ENDIAN).getInt
     currentDatatypeCount = 0
     readPos += 5
 
@@ -231,14 +231,14 @@ class Message() {
       readNextDatatype
     }
 
-    readPos += 8*num
+    readPos += 8 * num
     currentDatatypeCount += num
     val vec = new Array[Double](num)
 
-    ByteBuffer.wrap(messageBuffer.array.slice(readPos - 8*num, readPos))
-        .order(ByteOrder.BIG_ENDIAN)
-        .asDoubleBuffer()
-        .get(vec)
+    ByteBuffer.wrap(messageBuffer.array.slice(readPos - 8 * num, readPos))
+      .order(ByteOrder.BIG_ENDIAN)
+      .asDoubleBuffer()
+      .get(vec)
 
     vec
   }
@@ -249,13 +249,13 @@ class Message() {
       readNextDatatype
     }
 
-    readPos += 2*currentDatatypeCountMax
+    readPos += 2 * currentDatatypeCountMax
     currentDatatypeCount = currentDatatypeCountMax
-    new String(ByteBuffer.wrap(messageBuffer.array.slice(readPos - 2*currentDatatypeCountMax, readPos)).order(ByteOrder.BIG_ENDIAN).array(), "utf-16")
+    new String(ByteBuffer.wrap(messageBuffer.array.slice(readPos - 2 * currentDatatypeCountMax, readPos)).order(ByteOrder.BIG_ENDIAN).array(), "utf-16")
   }
 
   // Writing data
-  def start(clientID: Short, sessionID: Short, s: String): this.type = {
+  def start(clientID: Short, sessionID: Short, command: Command): this.type = {
 
     reset
     tempBuffer.clear
@@ -274,7 +274,7 @@ class Message() {
       messageBuffer.put(i + 2, bbArray(i))
     }
 
-    messageBuffer.put(4, Commands.getCode(s))
+    messageBuffer.put(4, command.value)
 
     this
   }
@@ -448,7 +448,7 @@ class Message() {
 
     checkDatatype("STRING").putString(value, writePos)
     currentDatatypeCount = value.length
-    writePos += 2*currentDatatypeCount
+    writePos += 2 * currentDatatypeCount
     currentDatatype = 0
 
     this
@@ -504,22 +504,22 @@ class Message() {
     messageBuffer.array.slice(0, headerLength + bodyLength)
   }
 
-//  def flush: this.type = {
-//    updateBodyLength.updateDatatype
-//
-//    if (messageBuffer.hasArray) {
-//      val array = messageBuffer.array.slice(0, headerLength + bodyLength)
-//      Collections.reverse(Arrays.asList(array))
-//      output.write(array)
-//    }
-//    else {
-//      System.out.println("Ooops")
-//    }
-//
-//    output.flush
-//
-//    this
-//  }
+  //  def flush: this.type = {
+  //    updateBodyLength.updateDatatype
+  //
+  //    if (messageBuffer.hasArray) {
+  //      val array = messageBuffer.array.slice(0, headerLength + bodyLength)
+  //      Collections.reverse(Arrays.asList(array))
+  //      output.write(array)
+  //    }
+  //    else {
+  //      System.out.println("Ooops")
+  //    }
+  //
+  //    output.flush
+  //
+  //    this
+  //  }
 
   // ========================================================================================
 
@@ -539,7 +539,7 @@ class Message() {
     System.out.println(s"$space ==============================================")
     System.out.println(s"$space Client ID:            $tempClientID")
     System.out.println(s"$space Session ID:           $tempSessionID")
-    System.out.println(s"$space Command code:         $tempCommandCode (${Commands.getName(tempCommandCode)})")
+    System.out.println(s"$space Command code:         $tempCommandCode (${Command.withValue(tempCommandCode).entryName})")
     System.out.println(s"$space Message body length:  $tempBodyLength")
     System.out.println(s"$space ----------------------------------------------")
     System.out.println(" ")
@@ -557,10 +557,10 @@ class Message() {
       i += 5
 
       if (dataArrayType == "STRING") {
-        val stringBuffer = tt.slice(i, i + 2*dataArrayLength)
+        val stringBuffer = tt.slice(i, i + 2 * dataArrayLength)
 
         data = " " + new String(stringBuffer, "utf-16")
-        i += 2*dataArrayLength
+        i += 2 * dataArrayLength
       }
       else {
         var dataTypeLength: Int = 0
