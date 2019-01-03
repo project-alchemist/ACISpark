@@ -1,32 +1,22 @@
 package alchemist
+
 // spark-core
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
-import org.apache.spark.SparkConf
 import org.apache.spark.rdd._
 // spark-sql
 import org.apache.spark.sql.SparkSession
 // spark-mllib
-import org.apache.spark.mllib.clustering.{KMeans, KMeansModel}
-import org.apache.spark.mllib.linalg.{Vector, Vectors, Matrix, Matrices}
-import org.apache.spark.mllib.linalg.{DenseMatrix, DenseVector}
-import org.apache.spark.mllib.linalg.distributed.RowMatrix
-import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix}
-import org.apache.spark.mllib.linalg.SingularValueDecomposition
+import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix, RowMatrix}
+import org.apache.spark.mllib.linalg.{DenseVector, Matrices, Matrix, SingularValueDecomposition, Vector, Vectors}
 
 //import alchemist.{AlchemistSession, MatrixHandle}
 //breeze
-import breeze.linalg.{DenseVector => BDV, max, min, DenseMatrix => BDM, norm, diag, svd}
-import breeze.numerics._
 // others
-import scala.math
-import java.io._
 
 object TestSvd {
   def main(args: Array[String]): Unit = {
     // Parse parameters from command line arguments
-    val k: Int = if(args.length > 0) args(0).toInt else 2
-    val infile: String = if(args.length > 1) args(1).toString else "Error!"
+    val k: Int = if (args.length > 0) args(0).toInt else 2
+    val infile: String = if (args.length > 1) args(1).toString else "Error!"
     // Print Info
     println("Settings: ")
     println("Target dimension = " + k.toString)
@@ -70,7 +60,7 @@ object TestSvd {
     //// Spark Build-in Truncated SVD
     t1 = System.nanoTime()
     val mat: RowMatrix = new RowMatrix(labelVecRdd.map(pair => pair._2))
-    val svd: SingularValueDecomposition[RowMatrix, Matrix] = mat.computeSVD(k, computeU=false)
+    val svd: SingularValueDecomposition[RowMatrix, Matrix] = mat.computeSVD(k, computeU = false)
     val v: Matrix = svd.V
     t2 = System.nanoTime()
     println("Time cost of Spark truncated SVD clustering: ")
@@ -151,7 +141,7 @@ object TestSvd {
 
     // Alchemist matrix to local matrix
     t1 = System.nanoTime()
-    val arrV: Array[Array[Double]] =  als.getIndexedRowMatrix(alV, sc)
+    val arrV: Array[Array[Double]] = als.getIndexedRowMatrix(alV, sc)
       .rows
       .map(row => row.vector.toArray)
       .collect
