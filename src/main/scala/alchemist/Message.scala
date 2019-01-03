@@ -6,69 +6,6 @@ import java.nio.charset.Charset
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.{Arrays, Collections}
 
-object Commands {
-  private val commands = Map[String, Byte](
-    "WAIT" -> 0,
-
-    // Connection
-    "HANDSHAKE" -> 1,
-    "REQUEST_ID" -> 2,
-    "CLIENT_INFO" -> 3,
-    "SEND_TEST_STRING" -> 4,
-    "REQUEST_TEST_STRING" -> 5,
-    "CLOSE_CONNECTION" -> 6,
-
-    // Workers
-    "REQUEST_WORKERS" -> 11,
-    "YIELD_WORKERS" -> 12,
-    "SEND_ASSIGNED_WORKERS_INFO" -> 13,
-    "LIST_ALL_WORKERS" -> 14,
-    "LIST_ACTIVE_WORKERS" -> 15,
-    "LIST_INACTIVE_WORKERS" -> 16,
-    "LIST_ASSIGNED_WORKERS" -> 17,
-
-    // Libraries
-    "LIST_AVAILABLE_LIBRARIES" -> 21,
-    "LOAD_LIBRARY" -> 22,
-    "UNLOAD_LIBRARY" -> 23,
-
-    // Matrices
-    "MATRIX_INFO" -> 31,
-    "MATRIX_LAYOUT" -> 32,
-    "SEND_MATRIX_BLOCKS" -> 33,
-    "REQUEST_MATRIX_BLOCKS" -> 34,
-
-    // Tasks
-    "RUN_TASK" -> 41,
-
-    // Shutting down
-    "SHUTDOWN" -> 99
-  )
-
-  def getName(v: Byte): String = commands.find(_._2 == v).map(_._1).get
-
-  def getCode(v: String): Byte = commands(v)
-}
-
-object Datatypes {
-  val datatypes = Map[String, Byte](
-    "NONE" -> 0,
-    "BYTE" -> 18,
-    "SHORT" -> 34,
-    "INT" -> 35,
-    "LONG" -> 36,
-    "FLOAT" -> 15,
-    "DOUBLE" -> 16,
-    "CHAR" -> 5,
-    "STRING" -> 47,
-    "COMMAND_CODE" -> 47
-  )
-
-  def getName(v: Byte): String = datatypes.find(_._2 == v).map(_._1).get
-
-  def getCode(v: String): Byte = datatypes(v)
-}
-
 class Message() {
 
   val headerLength: Byte = 9
@@ -83,7 +20,7 @@ class Message() {
   var bodyLength: Int = 0
 
   // For writing data
-  var currentDatatype: Byte = Datatypes.getCode("NONE")
+  var currentDatatype: Byte = Datatype.NoneType.value
   var currentDatatypeCount: Int = 0
   var currentDatatypeCountMax: Int = 0
   var currentDatatypeCountPos: Int = headerLength + 1
@@ -96,7 +33,7 @@ class Message() {
     commandCode = Command.Wait.value
     bodyLength = 0
 
-    currentDatatype = Datatypes.getCode("NONE")
+    currentDatatype = Datatype.NoneType.value
     currentDatatypeCount = 0
     currentDatatypeCountMax = 0
     currentDatatypeCountPos = headerLength + 1
@@ -149,7 +86,7 @@ class Message() {
   }
 
   def getCurrentDatatypeName(): String = {
-    Datatypes.getName(currentDatatype)
+    Datatype.withValue(currentDatatype).entryName
   }
 
   def getCurrentDatatypeCount(): Int = {
@@ -307,7 +244,7 @@ class Message() {
 
   def writeByte(value: Byte): this.type = {
 
-    checkDatatype("BYTE").putByte(value, writePos)
+    checkDatatype(Datatype.ByteType).putByte(value, writePos)
     writePos += 1
 
     this
@@ -327,7 +264,7 @@ class Message() {
 
   def writeChar(value: Char): this.type = {
 
-    checkDatatype("CHAR").putChar(value, writePos)
+    checkDatatype(Datatype.CharType).putChar(value, writePos)
     writePos += 2
 
     this
@@ -347,7 +284,7 @@ class Message() {
 
   def writeShort(value: Short): this.type = {
 
-    checkDatatype("SHORT").putShort(value, writePos)
+    checkDatatype(Datatype.ShortType).putShort(value, writePos)
     writePos += 2
 
     this
@@ -367,7 +304,7 @@ class Message() {
 
   def writeInt(value: Int): this.type = {
 
-    checkDatatype("INT").putInt(value, writePos)
+    checkDatatype(Datatype.IntType).putInt(value, writePos)
     writePos += 4
 
     this
@@ -387,7 +324,7 @@ class Message() {
 
   def writeLong(value: Long): this.type = {
 
-    checkDatatype("LONG").putLong(value, writePos)
+    checkDatatype(Datatype.LongType).putLong(value, writePos)
     writePos += 8
 
     this
@@ -407,7 +344,7 @@ class Message() {
 
   def writeFloat(value: Float): this.type = {
 
-    checkDatatype("FLOAT").putFloat(value, writePos)
+    checkDatatype(Datatype.FloatType).putFloat(value, writePos)
     writePos += 4
 
     this
@@ -427,7 +364,7 @@ class Message() {
 
   def writeDouble(value: Double): this.type = {
 
-    checkDatatype("DOUBLE").putDouble(value, writePos)
+    checkDatatype(Datatype.DoubleType).putDouble(value, writePos)
     writePos += 8
 
     this
@@ -446,7 +383,7 @@ class Message() {
 
   def writeString(value: String): this.type = {
 
-    checkDatatype("STRING").putString(value, writePos)
+    checkDatatype(Datatype.StringType).putString(value, writePos)
     currentDatatypeCount = value.length
     writePos += 2 * currentDatatypeCount
     currentDatatype = 0
@@ -456,10 +393,10 @@ class Message() {
 
   // ========================================================================================
 
-  def checkDatatype(t: String): this.type = {
+  def checkDatatype(datatype: Datatype): this.type = {
 
-    if (currentDatatype != Datatypes.getCode(t)) {
-      currentDatatype = Datatypes.getCode(t)
+    if (currentDatatype != datatype.value) {
+      currentDatatype = datatype.value
 
       putInt(currentDatatypeCount, currentDatatypeCountPos)
       putByte(currentDatatype, writePos)
@@ -548,7 +485,7 @@ class Message() {
 
     while (i < tempBodyLength) {
 
-      val dataArrayType: String = Datatypes.getName(tt(i))
+      val dataArrayType: String = Datatype.withValue(tt(i)).entryName
       val dataArrayLength: Int = ByteBuffer.wrap(tt.slice(i + 1, i + 5)).order(ByteOrder.BIG_ENDIAN).getInt
 
       println(s"$space Datatype (length):    $dataArrayType ($dataArrayLength)")
