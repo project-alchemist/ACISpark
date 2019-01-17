@@ -23,17 +23,18 @@ import scala.math.max
 
 
 object AlchemistSession {
-  println("Launching Alchemist")
-
+  println("Starting Alchemist session")
 
   var connected: Boolean = false
 
-  var driverClient: DriverClient = _
-  var workerClients: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
+  val driverClient: DriverClient = new DriverClient()
+  val workerClients: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
+
+  println("Alchemist session ready")
 
   def main(args: Array[String]) {
 
-    initialize
+//    initialize
     connect("0.0.0.0", 24960)
 //    if (connected) {
 //      println("Connected to Alchemist")

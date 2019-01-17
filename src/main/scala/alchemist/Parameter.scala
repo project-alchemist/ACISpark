@@ -1,39 +1,80 @@
 package alchemist
 
-class Parameter(val _name: String, val _ctype: String, val _value: String) {
-  
-//  def getName(): String = _name
-//
-//  def getType(): String = _ctype
-//
-//  def getValue(): String = _value
-//
-//  override def toString(): String = {
-//
-//    val buf = new StringBuilder
-//    buf ++= _name + "("
-//
-//    	if (_ctype == "int") buf ++= "i"
-//    	else if (_ctype == "long") buf ++= "l"
-//    	else if (_ctype == "long long") buf ++= "ll"
-//    	else if (_ctype == "unsigned") buf ++= "u"
-//    	else if (_ctype == "unsigned long") buf ++= "ul"
-//    	else if (_ctype == "unsigned long long") buf ++= "ull"
-//    	else if (_ctype == "long double") buf ++= "ld"
-//    	else if (_ctype == "double") buf ++= "d"
-//    	else if (_ctype == "float") buf ++= "f"
-//    	else if (_ctype == "bool") buf ++= "b"
-//    	else if (_ctype == "char") buf ++= "c"
-//    	else if (_ctype == "string") buf ++= "s"
-//    	else if (_ctype == "matrix handle") buf ++= "mh"
-//
-//    buf ++= ")" + _value
-//    buf.toString
-//  }
+
+
+
+
+class Parameter:
+
+name = []
+datatype = []
+value = []
+
+datatypes = {"BYTE": 33,
+"SHORT": 34,
+"INT": 35,
+"LONG": 36,
+"FLOAT": 15,
+"DOUBLE": 16,
+"CHAR": 1,
+"STRING": 46,
+"MATRIX_INFO": 52}
+
+
+private[alchemist] abstract class Parameter(override val _name: String, override val _ctype: Datatype) {
+
+  def getName(): String = _name
+
+  def getDatatype(): Datatype = _ctype
+}
+
+class ByteParameter(val _name: String, val _ctype: Datatype, val _value: Byte) {
+
+  def getValue(): Byte = _value
+}
+
+class ShortParameter(val _name: String, val _ctype: Datatype, val _value: Short) {
+
+  def getValue(): Short = _value
+}
+
+class IntParameter(val _name: String, val _ctype: Datatype, val _value: Int) {
+
+  def getValue(): Int = _value
+}
+
+class LongParameter(val _name: String, val _ctype: Datatype, val _value: Long) {
+
+  def getValue(): Long = _value
+}
+
+class FloatParameter(val _name: String, val _ctype: Datatype, val _value: Float) {
+
+  def getValue(): Float = _value
+}
+
+class DoubleParameter(val _name: String, val _ctype: Datatype, val _value: Double) {
+
+  def getValue(): Double = _value
+}
+
+class CharParameter(val _name: String, val _ctype: Datatype, val _value: Char) {
+
+  def getValue(): Char = _value
+}
+
+class StringParameter(val _name: String, val _ctype: Datatype, val _value: String) {
+
+  def getValue(): String = _value
+}
+
+class MatrixInfoParameter(val _name: String, val _ctype: Datatype, val _value: MatrixHandle) {
+
+  def getValue(): MatrixHandle = _value
 }
 
 class Parameters() {
-  
+
 //  val p = scala.collection.mutable.ArrayBuffer.empty[Parameter]
 //
 //  def addParameter(name: String, ctype: String, value: String): Unit = {

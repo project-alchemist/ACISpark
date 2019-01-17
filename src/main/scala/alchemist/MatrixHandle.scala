@@ -4,25 +4,44 @@ import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix}
 import scala.math.max
 import org.apache.spark.sql.SparkSession
 
-class MatrixHandle(val id: Short, val numRows: Long, val numCols: Long) extends Serializable {
+class MatrixHandle(val id: Short = 0, val name: String = "", val numRows: Long = 0, val numCols: Long = 0,
+                   val sparse: Boolean = false, val numPartitions: Byte = 0,
+                   val rowLayout: Array[Byte] = Array.empty[Byte]) {
 
-  var rowLayout: Array[Short] = Array.empty[Short]
-  var workerLayout: Map[Short, Array[Long]] = Map.empty[Short, Array[Long]]
+  def getID: Short = id
 
-  def getDimensions: Tuple2[Long, Long] = {
-    (numRows, numCols)
-  }
+  def getName: String = name
 
-  def setRowLayout(_rowLayout: Array[Short]): this.type = {
-    rowLayout = _rowLayout
+  def getNumRows: Long = numRows
 
-    var i: Int = 0
-    for (i <- rowLayout.indices) println(s"RR ${i} ${rowLayout(i)}")
+  def getNumCols: Long = numCols
 
-    this
-  }
+  def getDimensions = (numRows, numCols)
+
+  def getSparse: Boolean = sparse
+
+  def getNumPartitions: Byte = numPartitions
+
+  def getRowLayout: Array[Byte] = rowLayout
 
   def getIndexedRowMatrix(ss: SparkSession): IndexedRowMatrix = {
     AlchemistSession.getIndexedRowMatrix(this, ss.sparkContext)
+  }
+
+  def meta(displayLayout: Boolean = false): this.type = {
+
+    println(s"Name:                  $name")
+    println(s"ID:                    $id")
+    println(" ")
+    println(s"Number of rows:        $numRows")
+    println(s"Number of columns:     $numCols")
+    println(" ")
+    println(s"Sparse:                $sparse")
+    println(s"Number of partitions:  $numPartitions")
+    if (display_layout) {
+      print(" ")
+      print(s"Layout:")
+      for (i <- rowLayout.indices) println(s"    ${i} ${rowLayout(i)}")
+    }
   }
 }
