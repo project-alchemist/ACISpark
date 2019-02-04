@@ -5,7 +5,7 @@ import scala.math.max
 import org.apache.spark.sql.SparkSession
 
 class MatrixHandle(val id: Short = 0, val name: String = "", val numRows: Long = 0, val numCols: Long = 0,
-                   val sparse: Boolean = false, val numPartitions: Byte = 0,
+                   val sparse: Byte = 0, val numPartitions: Byte = 0,
                    val rowLayout: Array[Byte] = Array.empty[Byte]) {
 
   def getID: Short = id
@@ -18,7 +18,7 @@ class MatrixHandle(val id: Short = 0, val name: String = "", val numRows: Long =
 
   def getDimensions = (numRows, numCols)
 
-  def getSparse: Boolean = sparse
+  def getSparse: Byte = sparse
 
   def getNumPartitions: Byte = numPartitions
 
@@ -38,10 +38,12 @@ class MatrixHandle(val id: Short = 0, val name: String = "", val numRows: Long =
     println(" ")
     println(s"Sparse:                $sparse")
     println(s"Number of partitions:  $numPartitions")
-    if (display_layout) {
+    if (displayLayout) {
       print(" ")
       print(s"Layout:")
       for (i <- rowLayout.indices) println(s"    ${i} ${rowLayout(i)}")
     }
+
+    this
   }
 }

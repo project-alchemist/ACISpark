@@ -81,7 +81,7 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
     readMessage.reset
     readMessage.addHeader(header)
 
-    var remainingBodyLength: Int = readMessage.readBodyLength()
+    var remainingBodyLength: Int = readMessage.readBodyLength
 
     while (remainingBodyLength > 0) {
       val length: Int = Array(remainingBodyLength, 8192).min

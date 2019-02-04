@@ -39,7 +39,7 @@ class WorkerSession(val address: String, val port: Int) {
     inputMessage.reset
     inputMessage.addHeader(header)
 
-    var remainingBodyLength: Int = inputMessage.readBodyLength()
+    var remainingBodyLength: Int = inputMessage.readBodyLength
 
     while (remainingBodyLength > 0) {
       val length: Int = Array(remainingBodyLength, 8192).min

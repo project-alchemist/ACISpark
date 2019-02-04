@@ -54,7 +54,11 @@ class Message() {
   def getBodyLength: Int = bodyLength
 
   // Return raw byte array
-  def get: this.type = updateBodyLength.updateDatatype.messageBuffer.array.slice(0, headerLength + bodyLength)
+  def get: this.type = {
+    updateBodyLength.updateDatatypeCount.messageBuffer.array.slice(0, headerLength + bodyLength)
+
+    this
+  }
 
   // Reading header
   def readClientID: Short = ByteBuffer.wrap(messageBuffer.array.slice(0, 2)).order(ByteOrder.BIG_ENDIAN).getShort
@@ -183,7 +187,7 @@ class Message() {
     vec
   }
 
-  def readString(): String = {
+  def readString: String = {
 
     if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) {
       readNextDatatype
@@ -202,6 +206,8 @@ class Message() {
     if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) {
       readNextDatatype
     }
+
+    this
   }
 
   def readLibraryID: Byte = {
@@ -233,7 +239,7 @@ class Message() {
     var name: String = " "
     if (nameLength > 0) {
       readPos += 2 * nameLength
-      name = new String(ByteBuffer.wrap(messageBuffer.array.slice(readPos - 2 * strLength, readPos))
+      name = new String(ByteBuffer.wrap(messageBuffer.array.slice(readPos - 2 * nameLength, readPos))
                                   .order(ByteOrder.BIG_ENDIAN).array(), "utf-16")
     }
     readPos += 8
@@ -243,17 +249,17 @@ class Message() {
     val numCols: Long = ByteBuffer.wrap(messageBuffer.array.slice(readPos - 8, readPos))
       .order(ByteOrder.BIG_ENDIAN).getLong
     readPos += 1
-    val sparse: Boolean = messageBuffer.get(readPos - 1)
+    val sparse: Byte = messageBuffer.get(readPos - 1)
     readPos += 1
     val layout: Byte = messageBuffer.get(readPos - 1)
     readPos += 1
     val numPartitions: Byte = messageBuffer.get(readPos - 1)
-    val rowLayout = Array[Byte](numRows)
-    for (i <- 0 to numRows) {
+    val rowLayout = new Array[Byte](10)
+    for (i <- 0l to numRows) {
       readPos += 1
-      rowLayout(i) = messageBuffer.get(readPos - 1)
+      messageBuffer.get(readPos - 1)
     }
-    MatrixHandle(matrixID, name, numRows, numCols, sparse, numPartitions, rowLayout)
+    new MatrixHandle(matrixID, name, numRows, numCols, sparse, numPartitions, rowLayout)
   }
 
   // Writing data
@@ -280,7 +286,7 @@ class Message() {
   def addHeader(header: Array[Byte]): this.type = {
 
     for (i <- 0 until 9) messageBuffer.put(i, header(i))
-    readHeader()
+    readHeader
 
     this
   }
@@ -465,8 +471,8 @@ class Message() {
 
   def checkDatatype(datatype: Datatype): this.type = {
 
-    if (currentDatatype != datatype.value) {
-      currentDatatype = datatype.value
+    if (currentDatatype != Datatype.IntType.value) {
+      currentDatatype = Datatype.IntType.value
 
       updateDatatypeCount
       putByte(currentDatatype, writePos)
@@ -543,35 +549,35 @@ class Message() {
       i += 5
 
       for (j <- 0 to dataArrayLength) {
-        if (dataArrayType == datatype.ByteType.value) {
+        if (dataArrayType == Datatype.ByteType.value) {
           data = data.concat(s"${tt(i)} ")
           i += 1
         }
-        else if (dataArrayType == datatype.CharType.value) {
+        else if (dataArrayType == Datatype.CharType.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 2)).order(ByteOrder.BIG_ENDIAN).getChar}")
           i += 2
         }
-        else if (dataArrayType == datatype.ShortType.value) {
+        else if (dataArrayType == Datatype.ShortType.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 2)).order(ByteOrder.BIG_ENDIAN).getShort} ")
           i += 2
         }
-        else if (dataArrayType == datatype.IntType.value) {
+        else if (dataArrayType == Datatype.IntType.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 4)).order(ByteOrder.BIG_ENDIAN).getInt} ")
           i += 4
         }
-        else if (dataArrayType == datatype.LongType.value) {
+        else if (dataArrayType == Datatype.LongType.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 8)).order(ByteOrder.BIG_ENDIAN).getLong} ")
           i += 8
         }
-        else if (dataArrayType == datatype.FloatType.value) {
+        else if (dataArrayType == Datatype.FloatType.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 4)).order(ByteOrder.BIG_ENDIAN).getFloat}")
           i += 4
         }
-        else if (dataArrayType == datatype.DoubleType.value) {
+        else if (dataArrayType == Datatype.DoubleType.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 8)).order(ByteOrder.BIG_ENDIAN).getDouble}")
           i += 8
         }
-        else if (dataArrayType == datatype.StringType.value) {
+        else if (dataArrayType == Datatype.StringType.value) {
           val strLength: Int = ByteBuffer.wrap(tt.slice(i, i + 4)).order(ByteOrder.BIG_ENDIAN).getInt
           i += 4
           if (strLength > 0) {
@@ -580,15 +586,15 @@ class Message() {
             i += 2 * strLength
           }
         }
-        else if (dataArrayType == datatype.LibraryID.value) {
+        else if (dataArrayType == Datatype.LibraryID.value) {
           data = data.concat(s"${tt(i)} ")
           i += 1
         }
-        else if (dataArrayType == datatype.MatrixID.value) {
+        else if (dataArrayType == Datatype.MatrixID.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 2)).order(ByteOrder.BIG_ENDIAN).getShort}")
           i += 2
         }
-        else if (dataArrayType == datatype.MatrixInfo.value) {
+        else if (dataArrayType == Datatype.MatrixInfo.value) {
           val matrixID: Short = ByteBuffer.wrap(tt.slice(i, i + 2))
                                           .order(ByteOrder.BIG_ENDIAN).getShort
           i += 2
@@ -604,14 +610,14 @@ class Message() {
           i += 8
           val numCols: Long = ByteBuffer.wrap(tt.slice(i, i + 8)).order(ByteOrder.BIG_ENDIAN).getLong
           i += 8
-          val sparse: Boolean = tt(i)
+          val sparse: Byte = tt(i)
           i += 1
           val layout: Byte = tt(i)
           i += 1
           val numPartitions: Byte = tt(i)
-          val rowLayout = Array[Byte](numRows)
-          for (k <- 0 to numRows) {
-            rowLayout(k) = messageBuffer.get(i)
+          val rowLayout = Array[Byte](10)
+          for (k <- 0l to numRows) {
+            messageBuffer.get(i)
             i += 1
           }
           val mh = new MatrixHandle(matrixID, name, numRows, numCols, sparse, numPartitions, rowLayout)

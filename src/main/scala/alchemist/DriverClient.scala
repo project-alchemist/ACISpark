@@ -116,7 +116,7 @@ class DriverClient {          // Connects to the Alchemist driver
     readMessage.reset
     readMessage.addHeader(header)
 
-    var remainingBodyLength: Int = readMessage.readBodyLength()
+    var remainingBodyLength: Int = readMessage.readBodyLength
 
     while (remainingBodyLength > 0) {
       val length: Int = Array(remainingBodyLength, 8192).min
@@ -132,40 +132,6 @@ class DriverClient {          // Connects to the Alchemist driver
     this
   }
 
-  def truncatedSVD(lh: String, name: String, mh: MatrixHandle, rank: Int): (MatrixHandle, MatrixHandle, MatrixHandle) = {
-
-    val method: Byte = 0
-    writeMessage.start(clientID, sessionID, RunTask)
-    writeMessage.writeString(name)
-    writeMessage.writeShort(mh.id)
-    writeMessage.writeInt(rank)
-    writeMessage.writeByte(method)
-    sendMessage
-    receiveMessage
-
-    var matrixID = readMessage.readShort
-    var numRows = readMessage.readLong
-    var numCols = readMessage.readLong
-
-    val U: MatrixHandle = new MatrixHandle(matrixID, numRows, numCols)
-    U.rowLayout = extractLayout
-
-    matrixID = readMessage.readShort
-    numRows = readMessage.readLong
-    numCols = readMessage.readLong
-
-    val S: MatrixHandle = new MatrixHandle(matrixID, numRows, numCols)
-    S.rowLayout = extractLayout
-
-    matrixID = readMessage.readShort
-    numRows = readMessage.readLong
-    numCols = readMessage.readLong
-
-    val V: MatrixHandle = new MatrixHandle(matrixID, numRows, numCols)
-    V.rowLayout = extractLayout
-
-    (U, S, V)
-  }
 
 //  def handleMessage: this.type = {
 //
@@ -232,7 +198,7 @@ class DriverClient {          // Connects to the Alchemist driver
     this
   }
 
-  def clientInfo(numWorkers: Short, logDir: String): this.type = {
+  def clientInfo(numWorkers: Byte, logDir: String): this.type = {
 
     writeMessage.start(clientID, sessionID, ClientInfo)
     writeMessage.writeShort(numWorkers)
@@ -278,7 +244,7 @@ class DriverClient {          // Connects to the Alchemist driver
     testString
   }
 
-  def requestWorkers(numWorkers: Short): Map[Short, WorkerClient] = {
+  def requestWorkers(numWorkers: Byte): Map[Byte, WorkerClient] = {
 
     println(s"Requesting $numWorkers Alchemist workers")
 
@@ -287,7 +253,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
     sendMessage
 
-    val numAssignedWorkers: Short = readMessage.readShort()
+    val numAssignedWorkers: Byte = readMessage.readByte()
 
 
 //    var workerClients: Array[WorkerClient] = Array.empty[WorkerClient]
@@ -299,17 +265,17 @@ class DriverClient {          // Connects to the Alchemist driver
 //
 //    }
 
-    var workers: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
+    var workers: Map[Byte, WorkerClient] = Map.empty[Byte, WorkerClient]
 
     (0 until numAssignedWorkers).foreach(_ => {
-      val ID = readMessage.readShort()
-      workers += (ID -> new WorkerClient(ID, readMessage.readString(), readMessage.readString(), readMessage.readShort()))
+      val ID: Byte = readMessage.readByte
+      workers += (ID -> new WorkerClient(ID, readMessage.readString, readMessage.readString, readMessage.readByte))
     })
 
     workers
   }
 
-  def yieldWorkers: this.type = {
+  def yieldWorkers(yieldedWorkers: List[Byte] = List.empty[Byte]): List[Byte] = {
 
     println(s"Yielding Alchemist workers")
 
@@ -317,11 +283,11 @@ class DriverClient {          // Connects to the Alchemist driver
 
     sendMessage
 
-    val message: String = readMessage.readString()
+    val message: String = readMessage.readString
 
     println(message)
 
-    this
+    yieldedWorkers
   }
 
   def sendMatrixInfo(numRows: Long, numCols: Long): MatrixHandle = {
@@ -337,7 +303,7 @@ class DriverClient {          // Connects to the Alchemist driver
     val matrixID: Short = readMessage.readShort
     val rowLayout: Array[Short] = extractLayout
 
-    new MatrixHandle(matrixID, numRows, numCols).setRowLayout(rowLayout)
+    new MatrixHandle(matrixID)
   }
 
   def extractLayout: Array[Short] = {
@@ -347,56 +313,56 @@ class DriverClient {          // Connects to the Alchemist driver
     (0l until numRows).map(_ => readMessage.readShort).toArray
   }
 
-  def sendAssignedWorkersInfo: this.type = {
+  def sendAssignedWorkersInfo(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, SendAssignedWorkersInfo)
 
     sendMessage
   }
 
-  def listAllWorkers: this.type = {
+  def listAllWorkers(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, ListAllWorkers)
 
     sendMessage
   }
 
-  def listActiveWorkers: this.type = {
+  def listActiveWorkers(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, ListActiveWorkers)
 
     sendMessage
   }
 
-  def listInactiveWorkers: this.type = {
+  def listInactiveWorkers(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, ListInactiveWorkers)
 
     sendMessage
   }
 
-  def listAssignedWorkers: this.type = {
+  def listAssignedWorkers(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, ListAssignedWorkers)
 
     sendMessage
   }
 
-  def loadLibrary: this.type = {
+  def loadLibrary(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, LoadLibrary)
 
     sendMessage
   }
 
-  def runTask: this.type = {
+  def runTask(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, RunTask)
 
     sendMessage
   }
 
-  def unloadLibrary: this.type = {
+  def unloadLibrary(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, UnloadLibrary)
 
@@ -430,7 +396,8 @@ class DriverClient {          // Connects to the Alchemist driver
     this
   }
 
-  def stop: this.type = {
-    yieldWorkers.disconnectFromAlchemist
+  def close: this.type = {
+    yieldWorkers()
+    disconnectFromAlchemist
   }
 }
