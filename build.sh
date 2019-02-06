@@ -3,7 +3,7 @@ set -o errexit
 
 source ./config.sh
 
-export ACISPARK_JAR=$ACISPARK_PATH/target/scala-2.11/alchemist-assembly-0.5.jar
+export ACISPARK_JAR=$ACISPARK_PATH/target/scala-2.11/aci-spark-assembly-0.5.jar
 
 CURR_DIR=$PWD
 

@@ -33,6 +33,8 @@ object AlchemistSession {
   val driver: DriverClient = new DriverClient()
   var workers: Map[Byte, WorkerClient] = Map.empty[Byte, WorkerClient]
 
+  var spark: SparkSession = _
+
   println("Alchemist session ready")
 
   def main(args: Array[String]) {
@@ -48,6 +50,12 @@ object AlchemistSession {
 //    requestWorkers(2)
 
 //    stop
+  }
+
+  def initialize(_spark: SparkSession): this.type = {
+    spark = _spark
+
+    this
   }
 
 
@@ -150,12 +158,12 @@ object AlchemistSession {
     mh
   }
 
-  def getIndexedRowMatrix(mh: MatrixHandle, sc: SparkContext): IndexedRowMatrix = {
+  def getIndexedRowMatrix(mh: MatrixHandle): IndexedRowMatrix = {
 
-    val layout: RDD[IndexedRow] = sc.parallelize(
+    val layout: RDD[IndexedRow] = spark.sparkContext.parallelize(
       (0l until mh.numRows).map(i => {
         new IndexedRow(i, new DenseVector(new Array[Double](1)))
-      }), sc.defaultParallelism)
+      }), spark.sparkContext.defaultParallelism)
 
     val indexedRows: RDD[IndexedRow] = layout.mapPartitionsWithIndex({ (idx, part) =>
       val rows = part.toArray

@@ -6,8 +6,25 @@ ThisBuild / scalaVersion := "2.11.12"
 
 lazy val SparkVersion = "2.3.2"
 
-lazy val `aci-spark` = (project in file("."))
+lazy val `alchemist-example` = (project in file("example"))
+  .dependsOn(`alchemist`)
   .settings(
+
+    target := { baseDirectory.value / "target" },
+
+    libraryDependencies ++= Seq(
+      "org.apache.spark" %% "spark-mllib" % SparkVersion % Provided
+    ),
+
+    run in Compile := Defaults
+      .runTask(fullClasspath in Compile, mainClass in (Compile, run), runner in (Compile, run))
+      .evaluated
+  )
+
+lazy val `alchemist` = (project in file("."))
+  .settings(
+
+    target := { baseDirectory.value / "target" },
 
     libraryDependencies ++= Seq(
       "org.apache.spark" %% "spark-mllib" % SparkVersion % Provided,
@@ -20,15 +37,3 @@ lazy val `aci-spark` = (project in file("."))
     parallelExecution in Test := false,
     fork in Test := true
   )
-
-lazy val `aci-spark-example` = (project in file("example"))
-  .settings(
-
-    libraryDependencies ++= Seq(
-      "org.apache.spark" %% "spark-mllib" % SparkVersion % Provided
-    ),
-
-    run in Compile := Defaults
-      .runTask(fullClasspath in Compile, mainClass in (Compile, run), runner in (Compile, run))
-      .evaluated
-  ).dependsOn(`aci-spark`)

@@ -24,9 +24,7 @@ class MatrixHandle(val id: Short = 0, val name: String = "", val numRows: Long =
 
   def getRowLayout: Array[Byte] = rowLayout
 
-  def getIndexedRowMatrix(ss: SparkSession): IndexedRowMatrix = {
-    AlchemistSession.getIndexedRowMatrix(this, ss.sparkContext)
-  }
+  def getIndexedRowMatrix: IndexedRowMatrix = AlchemistSession.getIndexedRowMatrix(this)
 
   def meta(displayLayout: Boolean = false): this.type = {
 
