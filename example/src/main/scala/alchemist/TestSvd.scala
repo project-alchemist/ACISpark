@@ -54,14 +54,16 @@ object TestSvd {
 
   def testSpark(spark: SparkSession, A: IndexedRowMatrix, k: Int): Unit = {
 
+    val sc = spark.sparkContext
+
     // Compute the Squared Frobenius Norm
-    val sqFroNorm: Double = A.rows.map(pair => Vectors.norm(pair._2, 2))
+    val sqFroNorm: Double = A.rows.map(row => Vectors.norm(row.vector, 2))
       .map(norm => norm * norm)
       .reduce((a, b) => a + b)
 
     // Spark built-in truncated SVD
     val startTime = System.nanoTime()
-    val svd: SingularValueDecomposition[IndexedRowMatrix, Matrix] = A.computeSVD()
+    val svd: SingularValueDecomposition[IndexedRowMatrix, Matrix] = A.computeSVD(k)
 //    val mat: RowMatrix = new RowMatrix(data.map(pair => pair._2))
 //    val svd: SingularValueDecomposition[RowMatrix, Matrix] = mat.computeSVD(k, computeU = false)
 //    val v: Matrix = svd.V
@@ -71,7 +73,7 @@ object TestSvd {
     // Compute approximation error
     val vBroadcast = sc.broadcast(svd.V)
     val err: Double = A.rows
-      .map(pair => (pair._2, vBroadcast.value.transpose.multiply(pair._2)))
+      .map(row => (row.vector, vBroadcast.value.transpose.multiply(row.vector)))
       .map(pair => (pair._1, Vectors.dense(vBroadcast.value.multiply(pair._2).toArray)))
       .map(pair => Vectors.sqdist(pair._1, pair._2))
       .reduce((a, b) => a + b)
@@ -83,8 +85,9 @@ object TestSvd {
 
   def testAlchemist(spark: SparkSession, A: IndexedRowMatrix, k: Int): Unit = {
 
+    val sc = spark.sparkContext
     // Compute the squared Frobenius norm
-    val sqFroNorm: Double = A.rows.map(pair => Vectors.norm(pair._2, 2))
+    val sqFroNorm: Double = A.rows.map(row => Vectors.norm(row.vector, 2))
       .map(norm => norm * norm)
       .reduce((a, b) => a + b)
 
@@ -116,7 +119,7 @@ object TestSvd {
 
     // Alchemist matrix to local matrix
     startTime = System.nanoTime()
-    val V: Array[Array[Double]] = als.getIndexedRowMatrix(Vh).rows.map(pair => pair._2.vector.toArray).collect
+    val V: Array[Array[Double]] = als.getIndexedRowMatrix(Vh).rows.map(row => row.vector.toArray).collect
     val d = V.size
     val matV: Matrix = Matrices.dense(k, d, V.flatten)
     println(s"Time cost of Alchemist matrix to local matrix: ${(System.nanoTime() - startTime) * 1.0E-9}")
@@ -128,7 +131,7 @@ object TestSvd {
     // Compute approximation error
     val vBroadcast = sc.broadcast(matV)
     val err: Double = A.rows
-      .map(pair => (pair._2, vBroadcast.value.multiply(pair._2)))
+      .map(row => (row.vector, vBroadcast.value.multiply(row.vector)))
       .map(pair => (pair._1, Vectors.dense(vBroadcast.value.transpose.multiply(pair._2).toArray)))
       .map(pair => Vectors.sqdist(pair._1, pair._2))
       .reduce((a, b) => a + b)
@@ -142,9 +145,13 @@ object TestSvd {
 
   def randomData(spark: SparkSession, numRows: Long, numCols: Long): IndexedRowMatrix = {
     // Generate random dataset
-    val r = scala.util.Random.setSeed(1000L)
+    val sc = spark.sparkContext
+    val r = new scala.util.Random(1000L)
 
-    val indexedRows: RDD[IndexedRow] = sc.parallelize((0L to numRows - 1).map(x => new IndexedRow(x, new DenseVector((for (_ <- 1 to numCols) yield r.nextDouble).toArray))))
+    val startTime = System.nanoTime()
+
+    val indexedRows: RDD[IndexedRow] = sc.parallelize((0L to numRows - 1)
+      .map(x => new IndexedRow(x, new DenseVector(Array.fill(numCols.toInt)(r.nextDouble())))))
 
     val data = new IndexedRowMatrix(indexedRows)
 
