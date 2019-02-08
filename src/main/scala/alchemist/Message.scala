@@ -1,18 +1,14 @@
 package alchemist
 
-//import java.util._
-import java.io._
-import java.nio.charset.Charset
-import java.nio.{ByteBuffer, ByteOrder}
-import java.util.{Arrays, Collections}
+import java.nio.{Buffer, ByteBuffer, ByteOrder}
 
 class Message() {
 
   val headerLength: Int = 9
   var maxBodyLength: Int = 10000000
 
-  val messageBuffer = ByteBuffer.allocate(headerLength + maxBodyLength).order(ByteOrder.BIG_ENDIAN)
-  val tempBuffer = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN)
+  val messageBuffer: ByteBuffer = ByteBuffer.allocate(headerLength + maxBodyLength).order(ByteOrder.BIG_ENDIAN)
+  val tempBuffer: ByteBuffer = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN)
 
   var clientID: Short = 0
   var sessionID: Short = 0
@@ -266,13 +262,13 @@ class Message() {
   def start(clientID: Short, sessionID: Short, command: Command): this.type = {
 
     reset
-    tempBuffer.clear
+    tempBuffer.asInstanceOf[Buffer].clear
     tempBuffer.putShort(clientID)
 
     var bbArray = tempBuffer.array
     for (i <- 0 until 2) messageBuffer.put(i, bbArray(i))
 
-    tempBuffer.clear
+    tempBuffer.asInstanceOf[Buffer].clear
     tempBuffer.putShort(sessionID)
 
     bbArray = tempBuffer.array
@@ -317,7 +313,7 @@ class Message() {
 
   def putChar(value: Char, pos: Int): this.type = {
 
-    tempBuffer.clear
+    tempBuffer.asInstanceOf[Buffer].clear
     tempBuffer.putChar(value)
 
     val bbArray = tempBuffer.array
@@ -336,7 +332,7 @@ class Message() {
 
   def putShort(value: Short, pos: Int): this.type = {
 
-    tempBuffer.clear
+    tempBuffer.asInstanceOf[Buffer].clear
     tempBuffer.putShort(value)
 
     val bbArray = tempBuffer.array
@@ -355,7 +351,7 @@ class Message() {
 
   def putInt(value: Int, pos: Int): this.type = {
 
-    tempBuffer.clear
+    tempBuffer.asInstanceOf[Buffer].clear
     tempBuffer.putInt(value)
 
     val bbArray = tempBuffer.array
@@ -374,7 +370,7 @@ class Message() {
 
   def putLong(value: Long, pos: Int): this.type = {
 
-    tempBuffer.clear
+    tempBuffer.asInstanceOf[Buffer].clear
     tempBuffer.putLong(value)
 
     val bbArray = tempBuffer.array
@@ -393,7 +389,7 @@ class Message() {
 
   def putFloat(value: Float, pos: Int): this.type = {
 
-    tempBuffer.clear
+    tempBuffer.asInstanceOf[Buffer].clear
     tempBuffer.putFloat(value)
 
     val bbArray = tempBuffer.array
@@ -412,7 +408,7 @@ class Message() {
 
   def putDouble(value: Double, pos: Int): this.type = {
 
-    tempBuffer.clear
+    tempBuffer.asInstanceOf[Buffer].clear
     tempBuffer.putDouble(value)
 
     val bbArray = tempBuffer.array
@@ -490,7 +486,7 @@ class Message() {
 
     bodyLength = writePos - headerLength
 
-    tempBuffer.clear
+    tempBuffer.asInstanceOf[Buffer].clear
     tempBuffer.putInt(bodyLength)
 
     val bbArray = tempBuffer.array
@@ -531,7 +527,7 @@ class Message() {
     System.out.println(s"$space{} ==============================================")
     System.out.println(s"$space Client ID:            $tempClientID")
     System.out.println(s"$space Session ID:           $tempSessionID")
-    System.out.println(s"$space Command code:         $tempCommandCode (${Command.withValue(tempCommandCode).entryName})")
+    System.out.println(s"$space Command code:         $tempCommandCode")// (${Command.withValue(tempCommandCode).entryName})
     System.out.println(s"$space Message body length:  $tempBodyLength")
     System.out.println(s"$space ------------------------------------------------")
     System.out.println(" ")

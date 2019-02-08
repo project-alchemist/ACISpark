@@ -15,7 +15,6 @@ import java.nio.file.{Files, Paths}
 import java.nio.charset.StandardCharsets
 
 import scala.compat.Platform.EOL
-import alchemist.Command._
 
 
 class DriverClient {          // Connects to the Alchemist driver
@@ -44,51 +43,29 @@ class DriverClient {          // Connects to the Alchemist driver
   var client: DriverSession = _
 
   def connect(address: String, port: Int): Boolean = {
-    println(s"Connecting to Alchemist at $address:$port")
 
     val pb = new ProcessBuilder("true")
 
-    driverProc = pb.redirectError(ProcessBuilder.Redirect.INHERIT).redirectOutput(ProcessBuilder.Redirect.INHERIT).start
+    driverProc = pb.redirectError(ProcessBuilder.Redirect.INHERIT)
+      .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+      .start
 
-    sock = new Socket(address, port)
+    try {
+      sock = new Socket(address, port)
 
-    in = sock.getInputStream
+      client = new DriverSession(sock.getInputStream, sock.getOutputStream)
 
-    client = new DriverSession(in, sock.getOutputStream)
+      handshake
+    }
+    catch {
+      case e: Exception => {
+        println("Alchemist appears to be offline")
+        println("Returned error: " + e)
 
-    handshake
-  }
-
-  def connect: Boolean = {
-
-    val pb = {
-      try {
-        val fstream: FileInputStream  = new FileInputStream("connection.info")
-        // Get the object of DataInputStream
-        val in: JDataInputStream = new JDataInputStream(fstream)
-        val br: BufferedReader = new BufferedReader(new InputStreamReader(in))
-        address = br.readLine()
-        port = Integer.parseInt(br.readLine)
-
-        in.close();         //Close the input stream
-
-        println(s"Connecting to Alchemist at $address:$port")
+        false
       }
-      catch {
-        case e: Exception => println("Got this unknown exception: " + e)
-      }
-
-      // dummy process
-      new ProcessBuilder("true")
     }
 
-    driverProc = pb.redirectError(ProcessBuilder.Redirect.INHERIT).redirectOutput(ProcessBuilder.Redirect.INHERIT).start
-
-    sock = new Socket(address, port)
-
-    client = new DriverSession(sock.getInputStream, sock.getOutputStream)
-
-    handshake
   }
 
   def sendMessage: this.type = {
@@ -163,7 +140,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def handshake: Boolean = {
 
-    writeMessage.start(0, 0, Handshake)
+    writeMessage.start(0, 0, Command.Handshake)
 
     writeMessage.writeByte(2)
     writeMessage.writeShort(1234)
@@ -187,7 +164,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def requestID: this.type = {
 
-    writeMessage.start(clientID, sessionID, RequestId)
+    writeMessage.start(clientID, sessionID, Command.RequestId)
 
     sendMessage
 
@@ -200,7 +177,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def clientInfo(numWorkers: Byte, logDir: String): this.type = {
 
-    writeMessage.start(clientID, sessionID, ClientInfo)
+    writeMessage.start(clientID, sessionID, Command.ClientInfo)
     writeMessage.writeShort(numWorkers)
     writeMessage.writeString(logDir)
 
@@ -215,7 +192,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def sendTestString(testString: String): String = {
 
-    writeMessage.start(clientID, sessionID, SendTestString)
+    writeMessage.start(clientID, sessionID, Command.SendTestString)
     writeMessage.writeString(testString)
 
     sendMessage
@@ -231,7 +208,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def requestTestString: String = {
 
-    writeMessage.start(clientID, sessionID, RequestTestString)
+    writeMessage.start(clientID, sessionID, Command.RequestTestString)
 
     sendMessage
 
@@ -248,7 +225,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
     println(s"Requesting $numWorkers Alchemist workers")
 
-    writeMessage.start(clientID, sessionID, RequestWorkers)
+    writeMessage.start(clientID, sessionID, Command.RequestWorkers)
     writeMessage.writeShort(numWorkers)
 
     sendMessage
@@ -279,7 +256,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
     println(s"Yielding Alchemist workers")
 
-    writeMessage.start(clientID, sessionID, YieldWorkers)
+    writeMessage.start(clientID, sessionID, Command.YieldWorkers)
 
     sendMessage
 
@@ -292,7 +269,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def sendMatrixInfo(numRows: Long, numCols: Long): MatrixHandle = {
 
-    writeMessage.start(clientID, sessionID, MatrixInfo)
+    writeMessage.start(clientID, sessionID, Command.MatrixInfo)
     writeMessage.writeByte(0)        // Type: dense
     writeMessage.writeByte(0)        // Layout: by rows (default)
     writeMessage.writeLong(numRows)         // Number of rows
@@ -315,77 +292,77 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def sendAssignedWorkersInfo(preamble: String): this.type = {
 
-    writeMessage.start(clientID, sessionID, SendAssignedWorkersInfo)
+    writeMessage.start(clientID, sessionID, Command.SendAssignedWorkersInfo)
 
     sendMessage
   }
 
   def listAllWorkers(preamble: String): this.type = {
 
-    writeMessage.start(clientID, sessionID, ListAllWorkers)
+    writeMessage.start(clientID, sessionID, Command.ListAllWorkers)
 
     sendMessage
   }
 
   def listActiveWorkers(preamble: String): this.type = {
 
-    writeMessage.start(clientID, sessionID, ListActiveWorkers)
+    writeMessage.start(clientID, sessionID, Command.ListActiveWorkers)
 
     sendMessage
   }
 
   def listInactiveWorkers(preamble: String): this.type = {
 
-    writeMessage.start(clientID, sessionID, ListInactiveWorkers)
+    writeMessage.start(clientID, sessionID, Command.ListInactiveWorkers)
 
     sendMessage
   }
 
   def listAssignedWorkers(preamble: String): this.type = {
 
-    writeMessage.start(clientID, sessionID, ListAssignedWorkers)
+    writeMessage.start(clientID, sessionID, Command.ListAssignedWorkers)
 
     sendMessage
   }
 
   def loadLibrary(preamble: String): this.type = {
 
-    writeMessage.start(clientID, sessionID, LoadLibrary)
+    writeMessage.start(clientID, sessionID, Command.LoadLibrary)
 
     sendMessage
   }
 
   def runTask(preamble: String): this.type = {
 
-    writeMessage.start(clientID, sessionID, RunTask)
+    writeMessage.start(clientID, sessionID, Command.RunTask)
 
     sendMessage
   }
 
   def unloadLibrary(preamble: String): this.type = {
 
-    writeMessage.start(clientID, sessionID, UnloadLibrary)
+    writeMessage.start(clientID, sessionID, Command.UnloadLibrary)
 
     sendMessage
   }
 
   def matrixInfo: this.type = {
 
-    writeMessage.start(clientID, sessionID, MatrixInfo)
+    writeMessage.start(clientID, sessionID, Command.MatrixInfo)
 
     sendMessage
   }
 
   def matrixLayout: this.type = {
 
-    writeMessage.start(clientID, sessionID, MatrixLayout)
+    writeMessage.start(clientID, sessionID, Command.MatrixLayout)
 
     sendMessage
   }
 
   def matrixBlock: this.type = {
 
-    writeMessage.start(clientID, sessionID, RequestMatrixBlocks) // TODO: Not sure which one this is.
+    writeMessage.start(clientID, sessionID, Command.RequestMatrixBlocks) // TODO: Not sure which one this is.
 
     sendMessage
   }

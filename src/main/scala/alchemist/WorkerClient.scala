@@ -15,9 +15,6 @@ import java.nio.charset.StandardCharsets
 import java.util.{Arrays, Collections}
 
 import scala.compat.Platform.EOL
-import alchemist.Command.{Handshake, RequestMatrixBlocks, SendMatrixBlocks}
-import alchemist.io._
-
 
 //class WorkerId(val id: Int)  { }
 
@@ -99,7 +96,7 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
 
   def handshake: Boolean = {
 
-    writeMessage.start(0, 0, Handshake)
+    writeMessage.start(0, 0, Command.Handshake)
 
     writeMessage.writeByte(2)
     writeMessage.writeShort(1234)
@@ -122,7 +119,7 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
   }
 
   def startSendMatrixBlocks(id: Short): this.type = {
-    writeMessage.start(clientID, sessionID, SendMatrixBlocks)
+    writeMessage.start(clientID, sessionID, Command.SendMatrixBlocks)
     writeMessage.writeShort(id)
 
     this
@@ -143,7 +140,7 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
   }
 
   def startRequestMatrixBlocks(id: Short): this.type = {
-    writeMessage.start(clientID, sessionID, RequestMatrixBlocks)
+    writeMessage.start(clientID, sessionID, Command.RequestMatrixBlocks)
     writeMessage.writeShort(id)
 
     this

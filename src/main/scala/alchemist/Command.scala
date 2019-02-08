@@ -45,3 +45,35 @@ private[alchemist] object Command extends ByteEnum[Command] {
   // Shutting down
   final case object Shutdown extends Command(99)
 }
+
+
+//sealed abstract class Command(val text: String, val code: Byte)
+//
+//case object Wait extends Command("WAIT",0)
+//case object Handshake extends Command("HANDSHAKE",1)
+//case object RequestId extends Command("REQUEST ID",2)
+//case object ClientInfo extends Command("CLIENT INFO",3)
+//case object SendTestString extends Command("SEND TEST STRING",4)
+//case object RequestTestString extends Command("REQUEST TEST STRING",5)
+//case object CloseConnection extends Command("CLOSE CONNECTION",6)
+//
+//case object RequestWorkers extends Command("WAIT",11)
+//case object YieldWorkers extends Command("HANDSHAKE",12)
+//case object SendAssignedWorkersInfo extends Command("REQUEST ID",13)
+//case object ListAllWorkers extends Command("CLIENT INFO",14)
+//case object ListActiveWorkers extends Command("SEND TEST STRING",15)
+//case object ListInactiveWorkers extends Command("REQUEST TEST STRING",16)
+//case object ListAssignedWorkers extends Command("CLOSE CONNECTION",17)
+//
+//case object ListAvailableLibraries extends Command("WAIT",21)
+//case object LoadLibrary extends Command("HANDSHAKE",22)
+//case object UnloadLibrary extends Command("REQUEST ID",23)
+//
+//case object MatrixInfo extends Command("WAIT",31)
+//case object MatrixLayout extends Command("HANDSHAKE",32)
+//case object SendMatrixBlocks extends Command("REQUEST ID",33)
+//case object RequestMatrixBlocks extends Command("REQUEST ID",34)
+//
+//case object RunTask extends Command("REQUEST ID",41)
+//
+//case object Shutdown extends Command("REQUEST ID",99)

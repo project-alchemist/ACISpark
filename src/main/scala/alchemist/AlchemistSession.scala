@@ -8,9 +8,8 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.Map
 import scala.collection.immutable.Seq
 import scala.util.Random
-
 import java.lang.reflect.Method
-import java.io.File
+import java.io.{BufferedReader, File, FileInputStream, InputStreamReader, DataInputStream => JDataInputStream, DataOutputStream => JDataOutputStream}
 
 // spark-core
 import org.apache.spark.rdd.RDD
@@ -86,8 +85,28 @@ object AlchemistSession {
     return name
   }
 
-  def connect(address: String, port: Int): this.type = {
+  def connect(_address: String = "", _port: Int = 0): this.type = {
 
+    var address = _address
+    var port = _port
+    if (address == "" || port == 0) {
+      println(s"Reading Alchemist address and port from file")
+      try {
+        val fstream: FileInputStream = new FileInputStream("connection.info")
+        // Get the object of DataInputStream
+        val in: JDataInputStream = new JDataInputStream(fstream)
+        val br: BufferedReader = new BufferedReader(new InputStreamReader(in))
+        address = br.readLine()
+        port = Integer.parseInt(br.readLine)
+
+        in.close() //Close the input stream
+      }
+      catch {
+        case e: Exception => println("Got this unknown exception: " + e)
+      }
+    }
+
+    println(s"Connecting to Alchemist at $address:$port")
     driver.connect(address, port)
 
     this

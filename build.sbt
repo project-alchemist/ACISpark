@@ -4,7 +4,7 @@ ThisBuild / organization := "alchemist"
 ThisBuild / version := "0.5"
 ThisBuild / scalaVersion := "2.11.12"
 
-lazy val SparkVersion = "2.3.2"
+lazy val SparkVersion = "2.4.0"
 
 lazy val `alchemist-example` = (project in file("example"))
   .dependsOn(`alchemist`)
