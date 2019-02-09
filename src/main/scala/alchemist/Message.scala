@@ -16,10 +16,10 @@ class Message() {
   var bodyLength: Int = 0
 
   // For writing data
-  var currentDatatype: Byte = Datatype.NoneType.value
+  var currentDatatype: Byte = Datatype.None.value
   var currentDatatypeCount: Int = 0
   var currentDatatypeCountMax: Int = 0
-  var currentDatatypeCountPos: Int = headerLength + 1
+  var currentDatatypeCountPos: Int = headerLength+1
 
   var readPos: Int = headerLength // for reading data
   var writePos: Int = headerLength // for writing data
@@ -31,10 +31,10 @@ class Message() {
     commandCode = Command.Wait.value
     bodyLength = 0
 
-    currentDatatype = Datatype.NoneType.value
+    currentDatatype = Datatype.None.value
     currentDatatypeCount = 0
     currentDatatypeCountMax = 0
-    currentDatatypeCountPos = headerLength
+    currentDatatypeCountPos = headerLength+1
 
     readPos = headerLength
     writePos = headerLength
@@ -80,7 +80,9 @@ class Message() {
   def readNextDatatype: this.type = {
     currentDatatype = messageBuffer.get(readPos)
     currentDatatypeCount = 0
-    currentDatatypeCountMax = ByteBuffer.wrap(messageBuffer.array.slice(readPos + 1, readPos + 5)).order(ByteOrder.BIG_ENDIAN).getInt
+    currentDatatypeCountMax = ByteBuffer.wrap(messageBuffer.array.slice(readPos + 1, readPos + 5))
+                                        .order(ByteOrder.BIG_ENDIAN)
+                                        .getInt
     readPos += 5
 
     this
@@ -94,7 +96,7 @@ class Message() {
 
   def getCurrentDatatype(): Byte = currentDatatype
 
-  def getCurrentDatatypeName(): String = Datatype.withValue(currentDatatype).entryName
+  def getCurrentDatatypeLabel(): String = Datatype.withValue(currentDatatype).label
 
   def getCurrentDatatypeCount(): Int = currentDatatypeCountMax
 
@@ -214,7 +216,7 @@ class Message() {
     messageBuffer.get(readPos - 1)
   }
 
-  def readMatrixID: Short = {
+  def readArrayID: Short = {
     if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
 
     readPos += 2
@@ -222,7 +224,7 @@ class Message() {
     ByteBuffer.wrap(messageBuffer.array.slice(readPos - 2, readPos)).order(ByteOrder.BIG_ENDIAN).getShort
   }
 
-  def readMatrixInfo: MatrixHandle = {
+  def readArrayInfo: ArrayHandle = {
     if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
 
     currentDatatypeCount += 1
@@ -255,7 +257,7 @@ class Message() {
       readPos += 1
       messageBuffer.get(readPos - 1)
     }
-    new MatrixHandle(matrixID, name, numRows, numCols, sparse, numPartitions, rowLayout)
+    new ArrayHandle(matrixID, name, numRows, numCols, sparse, numPartitions, rowLayout)
   }
 
   // Writing data
@@ -305,7 +307,7 @@ class Message() {
 
   def writeByte(value: Byte): this.type = {
 
-    checkDatatype(Datatype.ByteType).putByte(value, writePos)
+    checkDatatype(Datatype.Byte).putByte(value, writePos)
     writePos += 1
 
     this
@@ -324,7 +326,7 @@ class Message() {
 
   def writeChar(value: Char): this.type = {
 
-    checkDatatype(Datatype.CharType).putChar(value, writePos)
+    checkDatatype(Datatype.Char).putChar(value, writePos)
     writePos += 2
 
     this
@@ -343,7 +345,7 @@ class Message() {
 
   def writeShort(value: Short): this.type = {
 
-    checkDatatype(Datatype.ShortType).putShort(value, writePos)
+    checkDatatype(Datatype.Short).putShort(value, writePos)
     writePos += 2
 
     this
@@ -362,7 +364,7 @@ class Message() {
 
   def writeInt(value: Int): this.type = {
 
-    checkDatatype(Datatype.IntType).putInt(value, writePos)
+    checkDatatype(Datatype.Int).putInt(value, writePos)
     writePos += 4
 
     this
@@ -381,7 +383,7 @@ class Message() {
 
   def writeLong(value: Long): this.type = {
 
-    checkDatatype(Datatype.LongType).putLong(value, writePos)
+    checkDatatype(Datatype.Long).putLong(value, writePos)
     writePos += 8
 
     this
@@ -400,7 +402,7 @@ class Message() {
 
   def writeFloat(value: Float): this.type = {
 
-    checkDatatype(Datatype.FloatType).putFloat(value, writePos)
+    checkDatatype(Datatype.Float).putFloat(value, writePos)
     writePos += 4
 
     this
@@ -419,7 +421,7 @@ class Message() {
 
   def writeDouble(value: Double): this.type = {
 
-    checkDatatype(Datatype.DoubleType).putDouble(value, writePos)
+    checkDatatype(Datatype.Double).putDouble(value, writePos)
     writePos += 8
 
     this
@@ -436,7 +438,7 @@ class Message() {
 
   def writeString(value: String): this.type = {
 
-    checkDatatype(Datatype.StringType)
+    checkDatatype(Datatype.String)
     putInt(value.length, writePos)
     writePos += 4
     putString(value, writePos)
@@ -445,9 +447,9 @@ class Message() {
     this
   }
 
-  def writeMatrixID(value: Short): this.type = {
+  def writeArrayID(value: Short): this.type = {
 
-    checkDatatype(Datatype.MatrixID).putShort(value, writePos)
+    checkDatatype(Datatype.ArrayID).putShort(value, writePos)
     writePos += 2
 
     this
@@ -467,8 +469,8 @@ class Message() {
 
   def checkDatatype(datatype: Datatype): this.type = {
 
-    if (currentDatatype != Datatype.IntType.value) {
-      currentDatatype = Datatype.IntType.value
+    if (currentDatatype != datatype.value) {
+      currentDatatype = datatype.value
 
       updateDatatypeCount
       putByte(currentDatatype, writePos)
@@ -497,14 +499,13 @@ class Message() {
 
   def updateDatatypeCount: this.type = {
 
-    if (currentDatatypeCount > headerLength) putInt(currentDatatypeCount, currentDatatypeCountPos)
+    if (currentDatatypeCountPos > headerLength) putInt(currentDatatypeCount, currentDatatypeCountPos)
 
     this
   }
 
   def finish(): Array[Byte] = {
-    updateBodyLength
-    updateDatatypeCount
+    updateBodyLength.updateDatatypeCount
 
     messageBuffer.array.slice(0, headerLength + bodyLength)
   }
@@ -524,7 +525,7 @@ class Message() {
     val tempBodyLength: Int = ByteBuffer.wrap(tt.slice(5, 9)).order(ByteOrder.BIG_ENDIAN).getInt
 
     System.out.println()
-    System.out.println(s"$space{} ==============================================")
+    System.out.println(s"$space ==============================================")
     System.out.println(s"$space Client ID:            $tempClientID")
     System.out.println(s"$space Session ID:           $tempSessionID")
     System.out.println(s"$space Command code:         $tempCommandCode")// (${Command.withValue(tempCommandCode).entryName})
@@ -539,41 +540,41 @@ class Message() {
       val dataArrayType: Byte = tt(i)
       val dataArrayLength: Int = ByteBuffer.wrap(tt.slice(i + 1, i + 5)).order(ByteOrder.BIG_ENDIAN).getInt
 
-      println(s"$space Datatype (length):    $dataArrayType ($dataArrayLength)")
+      println(s"$space Datatype (length):    ${Datatype.withValue(dataArrayType).label} ($dataArrayLength)")
 
       data = ""
       i += 5
 
       for (j <- 0 to dataArrayLength) {
-        if (dataArrayType == Datatype.ByteType.value) {
-          data = data.concat(s"${tt(i)} ")
+        if (dataArrayType == Datatype.Byte.value) {
+          data = data.concat(s" ${tt(i)} ")
           i += 1
         }
-        else if (dataArrayType == Datatype.CharType.value) {
+        else if (dataArrayType == Datatype.Char.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 2)).order(ByteOrder.BIG_ENDIAN).getChar}")
           i += 2
         }
-        else if (dataArrayType == Datatype.ShortType.value) {
+        else if (dataArrayType == Datatype.Short.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 2)).order(ByteOrder.BIG_ENDIAN).getShort} ")
           i += 2
         }
-        else if (dataArrayType == Datatype.IntType.value) {
+        else if (dataArrayType == Datatype.Int.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 4)).order(ByteOrder.BIG_ENDIAN).getInt} ")
           i += 4
         }
-        else if (dataArrayType == Datatype.LongType.value) {
+        else if (dataArrayType == Datatype.Long.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 8)).order(ByteOrder.BIG_ENDIAN).getLong} ")
           i += 8
         }
-        else if (dataArrayType == Datatype.FloatType.value) {
+        else if (dataArrayType == Datatype.Float.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 4)).order(ByteOrder.BIG_ENDIAN).getFloat}")
           i += 4
         }
-        else if (dataArrayType == Datatype.DoubleType.value) {
+        else if (dataArrayType == Datatype.Double.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 8)).order(ByteOrder.BIG_ENDIAN).getDouble}")
           i += 8
         }
-        else if (dataArrayType == Datatype.StringType.value) {
+        else if (dataArrayType == Datatype.String.value) {
           val strLength: Int = ByteBuffer.wrap(tt.slice(i, i + 4)).order(ByteOrder.BIG_ENDIAN).getInt
           i += 4
           if (strLength > 0) {
@@ -586,11 +587,11 @@ class Message() {
           data = data.concat(s"${tt(i)} ")
           i += 1
         }
-        else if (dataArrayType == Datatype.MatrixID.value) {
+        else if (dataArrayType == Datatype.ArrayID.value) {
           data = data.concat(s" ${ByteBuffer.wrap(tt.slice(i, i + 2)).order(ByteOrder.BIG_ENDIAN).getShort}")
           i += 2
         }
-        else if (dataArrayType == Datatype.MatrixInfo.value) {
+        else if (dataArrayType == Datatype.ArrayInfo.value) {
           val matrixID: Short = ByteBuffer.wrap(tt.slice(i, i + 2))
                                           .order(ByteOrder.BIG_ENDIAN).getShort
           i += 2
@@ -616,7 +617,7 @@ class Message() {
             messageBuffer.get(i)
             i += 1
           }
-          val mh = new MatrixHandle(matrixID, name, numRows, numCols, sparse, numPartitions, rowLayout)
+          val mh = new ArrayHandle(matrixID, name, numRows, numCols, sparse, numPartitions, rowLayout)
           mh.meta(true)
           if (j < dataArrayLength-1)
             data = data.concat(s"\n $space                        ")
@@ -627,7 +628,7 @@ class Message() {
       System.out.println(" ")
     }
 
-    System.out.println(s"$space{} ==============================================")
+    System.out.println(s"$space ==============================================")
 
     this
   }

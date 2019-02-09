@@ -118,14 +118,14 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
     handshakeSuccess
   }
 
-  def startSendMatrixBlocks(id: Short): this.type = {
-    writeMessage.start(clientID, sessionID, Command.SendMatrixBlocks)
+  def startSendArrayBlocks(id: Short): this.type = {
+    writeMessage.start(clientID, sessionID, Command.SendArrayBlocks)
     writeMessage.writeShort(id)
 
     this
   }
 
-  def addSendMatrixBlock(blockRange: Array[Long], block: Array[Double]): this.type = {
+  def addSendArrayBlock(blockRange: Array[Long], block: Array[Double]): this.type = {
 
     blockRange.foreach(i => writeMessage.writeLong(i))
     block.foreach(v => writeMessage.writeDouble(v))
@@ -133,27 +133,27 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
     this
   }
 
-  def finishSendMatrixBlocks: this.type = {
+  def finishSendArrayBlocks: this.type = {
     sendMessage
 
     this
   }
 
-  def startRequestMatrixBlocks(id: Short): this.type = {
-    writeMessage.start(clientID, sessionID, Command.RequestMatrixBlocks)
+  def startRequestArrayBlocks(id: Short): this.type = {
+    writeMessage.start(clientID, sessionID, Command.RequestArrayBlocks)
     writeMessage.writeShort(id)
 
     this
   }
 
-  def addRequestedMatrixBlock(blockRange: Array[Long]): this.type = {
+  def addRequestedArrayBlock(blockRange: Array[Long]): this.type = {
 
     blockRange.foreach(i => writeMessage.writeLong(i))
 
     this
   }
 
-  def getRequestedMatrixBlock(blockRange: Array[Long]): DenseVector = {
+  def getRequestedArrayBlock(blockRange: Array[Long]): DenseVector = {
 
     if (readMessage.readPos == readMessage.headerLength)
       readMessage.readShort()
@@ -168,7 +168,7 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
     new DenseVector(readMessage.readDouble(numCols.toInt))
   }
 
-  def finishRequestMatrixBlocks: this.type = {
+  def finishRequestArrayBlocks: this.type = {
     sendMessage
 
     this
@@ -202,7 +202,7 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
 //    return inbuf
 //  }
 //
-//  def newMatrixAddRow(handle: MatrixHandle, rowIdx: Long, vals: Array[Double]) = {
+//  def newArrayAddRow(handle: ArrayHandle, rowIdx: Long, vals: Array[Double]) = {
 //    val outbuf = beginOutput(4 + 4 + 8 + 8 + 8 * vals.length)
 //    outbuf.putInt(0x1)  // typeCode = addRow
 //    outbuf.putInt(handle.id)
@@ -215,13 +215,13 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
 //    //System.err.println(s"Sent row ${rowIdx} successfully")
 //  }
 //
-//  def newMatrixPartitionComplete(handle: MatrixHandle) = {
+//  def newArrayPartitionComplete(handle: ArrayHandle) = {
 //    val outbuf = beginOutput(4)
 //    outbuf.putInt(0x2)  // typeCode = partitionComplete
 //    sendMessage(outbuf)
 //  }
 //
-//  def getIndexedRowMatrixRow(handle: MatrixHandle, rowIndex: Long, numCols: Int) : DenseVector = {
+//  def getIndexedRowArrayRow(handle: ArrayHandle, rowIndex: Long, numCols: Int) : DenseVector = {
 //    val outbuf = beginOutput(4 + 4 + 8)
 //    outbuf.putInt(0x3) // typeCode = getRow
 //    outbuf.putInt(handle.id)
@@ -239,7 +239,7 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
 //    return new DenseVector(vec)
 //  }
 //
-//  def getIndexedRowMatrixPartitionComplete(handle: MatrixHandle) = {
+//  def getIndexedRowArrayPartitionComplete(handle: ArrayHandle) = {
 //    val outbuf = beginOutput(4)
 //    println(s"Finished getting rows on worker")
 //    outbuf.putInt(0x4) // typeCode = doneGettingRows

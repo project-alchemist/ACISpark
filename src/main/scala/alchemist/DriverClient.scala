@@ -73,7 +73,7 @@ class DriverClient {          // Connects to the Alchemist driver
     val ar = writeMessage.finish()
     Collections.reverse(Arrays.asList(ar))
 
-//    writeMessage.print
+    writeMessage.print
 
     sock.getOutputStream.write(ar)
     sock.getOutputStream.flush
@@ -104,7 +104,7 @@ class DriverClient {          // Connects to the Alchemist driver
       readMessage.addPacket(packet, length)
     }
 
-//    readMessage.print
+    readMessage.print
 
     this
   }
@@ -267,9 +267,9 @@ class DriverClient {          // Connects to the Alchemist driver
     yieldedWorkers
   }
 
-  def sendMatrixInfo(numRows: Long, numCols: Long): MatrixHandle = {
+  def sendArrayInfo(numRows: Long, numCols: Long): ArrayHandle = {
 
-    writeMessage.start(clientID, sessionID, Command.MatrixInfo)
+    writeMessage.start(clientID, sessionID, Command.ArrayInfo)
     writeMessage.writeByte(0)        // Type: dense
     writeMessage.writeByte(0)        // Layout: by rows (default)
     writeMessage.writeLong(numRows)         // Number of rows
@@ -280,7 +280,7 @@ class DriverClient {          // Connects to the Alchemist driver
     val matrixID: Short = readMessage.readShort
     val rowLayout: Array[Short] = extractLayout
 
-    new MatrixHandle(matrixID)
+    new ArrayHandle(matrixID)
   }
 
   def extractLayout: Array[Short] = {
@@ -348,21 +348,21 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def matrixInfo: this.type = {
 
-    writeMessage.start(clientID, sessionID, Command.MatrixInfo)
+    writeMessage.start(clientID, sessionID, Command.ArrayInfo)
 
     sendMessage
   }
 
   def matrixLayout: this.type = {
 
-    writeMessage.start(clientID, sessionID, Command.MatrixLayout)
+    writeMessage.start(clientID, sessionID, Command.ArrayLayout)
 
     sendMessage
   }
 
   def matrixBlock: this.type = {
 
-    writeMessage.start(clientID, sessionID, Command.RequestMatrixBlocks) // TODO: Not sure which one this is.
+    writeMessage.start(clientID, sessionID, Command.RequestArrayBlocks) // TODO: Not sure which one this is.
 
     sendMessage
   }

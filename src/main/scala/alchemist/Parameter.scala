@@ -64,7 +64,7 @@ class StringParameter(val name: String, val ctype: Datatype, val value: String) 
   def getValue(): String = value
 }
 
-class MatrixInfoParameter(val name: String, val ctype: Datatype, val value: MatrixHandle) {
+class MatrixInfoParameter(val name: String, val ctype: Datatype, val value: ArrayHandle) {
 
-  def getValue(): MatrixHandle = value
+  def getValue(): ArrayHandle = value
 }

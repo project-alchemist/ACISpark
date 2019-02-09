@@ -4,9 +4,9 @@ import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix}
 import scala.math.max
 import org.apache.spark.sql.SparkSession
 
-class MatrixHandle(val id: Short = 0, val name: String = "", val numRows: Long = 0, val numCols: Long = 0,
-                   val sparse: Byte = 0, val numPartitions: Byte = 0,
-                   val rowLayout: Array[Byte] = Array.empty[Byte]) {
+class ArrayHandle(val id: Short = 0, val name: String = "", val numRows: Long = 0, val numCols: Long = 0,
+                  val sparse: Byte = 0, val numPartitions: Byte = 0,
+                  val rowLayout: Array[Byte] = Array.empty[Byte]) {
 
   def getID: Short = id
 

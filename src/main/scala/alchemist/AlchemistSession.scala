@@ -129,7 +129,7 @@ object AlchemistSession {
     this
   }
 
-  def runTask(libName: String, name: String, mh: MatrixHandle, rank: Int): this.type = {
+  def runTask(libName: String, name: String, mh: ArrayHandle, rank: Int): this.type = {
 
     println(s"Alchemist started task $name - please wait ...")
 //    start = time.time()
@@ -141,11 +141,11 @@ object AlchemistSession {
     this
   }
 
-  def getMatrixHandle(mat: IndexedRowMatrix): MatrixHandle = driver.sendMatrixInfo(mat.numRows, mat.numCols)
+  def getArrayHandle(mat: IndexedRowMatrix): ArrayHandle = driver.sendArrayInfo(mat.numRows, mat.numCols)
 
-  def sendIndexedRowMatrix(mat: IndexedRowMatrix): MatrixHandle = {
+  def sendIndexedRowMatrix(mat: IndexedRowMatrix): ArrayHandle = {
 
-    val mh = getMatrixHandle(mat)
+    val mh = getArrayHandle(mat)
 
     mat.rows.mapPartitionsWithIndex { (idx, part) =>
       val rows = part.toArray
@@ -160,15 +160,15 @@ object AlchemistSession {
       })
 
       if (connected == workers.size) {
-        workers.foreach(w => w._2.startSendMatrixBlocks(mh.id))
+        workers.foreach(w => w._2.startSendArrayBlocks(mh.id))
 
         rows.foreach(row => {
           lazy val elements = row.vector.toArray
           val index: Long = row.index
-          workers(mh.rowLayout(index.toInt)).addSendMatrixBlock(Array(index,index,0,elements.length-1), elements)
+          workers(mh.rowLayout(index.toInt)).addSendArrayBlock(Array(index,index,0,elements.length-1), elements)
         })
 
-        workers.foreach(w => w._2.finishSendMatrixBlocks.disconnectFromAlchemist)
+        workers.foreach(w => w._2.finishSendArrayBlocks.disconnectFromAlchemist)
       }
 
       part
@@ -177,7 +177,7 @@ object AlchemistSession {
     mh
   }
 
-  def getIndexedRowMatrix(mh: MatrixHandle): IndexedRowMatrix = {
+  def getIndexedRowMatrix(mh: ArrayHandle): IndexedRowMatrix = {
 
     val layout: RDD[IndexedRow] = spark.sparkContext.parallelize(
       (0l until mh.numRows).map(i => {
@@ -199,18 +199,18 @@ object AlchemistSession {
       var currentRowIter: Iterator[IndexedRow] = rows.map(row => new IndexedRow(row.index, row.vector)).iterator
 
       if (connected == workers.size) {
-        workers.foreach(w => w._2.startRequestMatrixBlocks(mh.id))
+        workers.foreach(w => w._2.startRequestArrayBlocks(mh.id))
 
         rows.foreach(row => {
           val index: Long = row.index
-          workers(mh.rowLayout(index.toInt)).addRequestedMatrixBlock(Array(index,index,0,mh.numCols-1))
+          workers(mh.rowLayout(index.toInt)).addRequestedArrayBlock(Array(index,index,0,mh.numCols-1))
         })
 
-        workers.foreach(w => w._2.finishRequestMatrixBlocks)
+        workers.foreach(w => w._2.finishRequestArrayBlocks)
 
         currentRowIter = rows.map(row => {
           val index: Long = row.index
-          new IndexedRow(index, workers(mh.rowLayout(index.toInt)).getRequestedMatrixBlock(Array(index,index,0,mh.numCols-1)))
+          new IndexedRow(index, workers(mh.rowLayout(index.toInt)).getRequestedArrayBlock(Array(index,index,0,mh.numCols-1)))
         }).iterator
 
         workers.foreach(w => w._2.disconnectFromAlchemist)
@@ -222,9 +222,9 @@ object AlchemistSession {
     new IndexedRowMatrix(indexedRows, mh.numRows, mh.numCols.toInt)
   }
 
-  def sendRowMatrix(mat: RowMatrix): MatrixHandle = getMatrixHandle(mat)
+  def sendRowMatrix(mat: RowMatrix): ArrayHandle = getArrayHandle(mat)
 
-  def getMatrixHandle(mat: RowMatrix): MatrixHandle = driver.sendMatrixInfo(mat.numRows, mat.numCols)
+  def getArrayHandle(mat: RowMatrix): ArrayHandle = driver.sendArrayInfo(mat.numRows, mat.numCols)
 
 
   def sendTestString(): this.type = {
@@ -313,7 +313,7 @@ object AlchemistSession {
   //  }
 //
 //  // Caches result by default, because may not want to recreate (e.g. if delete referenced matrix on Alchemist side to save memory)
-//  def getIndexedRowMatrix(handle: MatrixHandle): IndexedRowMatrix = {
+//  def getIndexedRowMatrix(handle: ArrayHandle): IndexedRowMatrix = {
 //    val (numRows, numCols) = getDimensions(handle)
 //    // TODO:
 //    // should map the rows back to the executors using locality information if possible
@@ -340,19 +340,19 @@ object AlchemistSession {
 //    result
 //  }
 //
-//  def readHDF5(fname: String, varname: String): MatrixHandle = client.readHDF5(fname, varname)
+//  def readHDF5(fname: String, varname: String): ArrayHandle = client.readHDF5(fname, varname)
 //
-//  def getDimensions(handle: MatrixHandle): Tuple2[Long, Int] = client.getMatrixDimensions(handle)
+//  def getDimensions(handle: ArrayHandle): Tuple2[Long, Int] = client.getArrayDimensions(handle)
 //
 //  def transpose(mat: IndexedRowMatrix): IndexedRowMatrix = {
-//    getIndexedRowMatrix(client.getTranspose(getMatrixHandle(mat)))
+//    getIndexedRowMatrix(client.getTranspose(getArrayHandle(mat)))
 //  }
 //
 //  def matrixMultiply(matA: IndexedRowMatrix, matB: IndexedRowMatrix): (IndexedRowMatrix, Array[Double]) = {
 //
 //    var t1 = System.nanoTime()
-//    val handleA = getMatrixHandle(matA)
-//    val handleB = getMatrixHandle(matB)
+//    val handleA = getArrayHandle(matA)
+//    val handleB = getArrayHandle(matB)
 //    val t2 = System.nanoTime() - t1
 //
 //    t1 = System.nanoTime()
