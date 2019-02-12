@@ -145,6 +145,13 @@ class DriverClient {          // Connects to the Alchemist driver
     writeMessage.writeByte(2)
     writeMessage.writeShort(1234)
     writeMessage.writeString("ABCD")
+    writeMessage.writeDouble(1.11)
+    writeMessage.writeDouble(2.22)
+    val testArray: ArrayBlock[Double] = new ArrayBlock[Double](
+      Array[Long](0l, 3l, 1l, 0l, 2l, 1l).grouped(3).toArray,
+      (for {r <- 3 to 14} yield 1.11*r).toArray
+    )
+    writeMessage.writeArrayBlock(testArray)
 
     sendMessage
 
@@ -153,8 +160,10 @@ class DriverClient {          // Connects to the Alchemist driver
     if (readMessage.readCommandCode == 1) {
       if (readMessage.readShort == 4321) {
         if (readMessage.readString == "DCBA") {
-          clientID = readMessage.readClientID
-          sessionID = readMessage.readSessionID
+          if (readMessage.readDouble ==  3.33) {
+            clientID = readMessage.readClientID
+            sessionID = readMessage.readSessionID
+          }
         }
       }
     }

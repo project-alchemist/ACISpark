@@ -42,8 +42,8 @@ private[alchemist] object Datatype extends ByteEnum[Datatype] {
   final case object Float extends Datatype(15, "FLOAT")
   final case object Double extends Datatype(16, "DOUBLE")
 
-  final case object Char extends Datatype(5, "CHAR")
-  final case object String extends Datatype(47, "STRING")
+  final case object Char extends Datatype(1, "CHAR")
+  final case object String extends Datatype(46, "STRING")
 
   final case object CommandCode extends Datatype(48, "COMMAND CODE")
   final case object Parameter extends Datatype(49, "PARAMETER")

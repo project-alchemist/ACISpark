@@ -6,7 +6,7 @@ import org.apache.spark.sql.SparkSession
 
 class ArrayHandle(val id: Short = 0, val name: String = "", val numRows: Long = 0, val numCols: Long = 0,
                   val sparse: Byte = 0, val numPartitions: Byte = 0,
-                  val rowLayout: Array[Byte] = Array.empty[Byte]) {
+                  val workerLayout: Array[Byte] = Array.empty[Byte]) {
 
   def getID: Short = id
 
@@ -22,7 +22,7 @@ class ArrayHandle(val id: Short = 0, val name: String = "", val numRows: Long = 
 
   def getNumPartitions: Byte = numPartitions
 
-  def getRowLayout: Array[Byte] = rowLayout
+  def getWorkerLayout: Array[Byte] = workerLayout
 
   def getIndexedRowMatrix: IndexedRowMatrix = AlchemistSession.getIndexedRowMatrix(this)
 
@@ -39,7 +39,7 @@ class ArrayHandle(val id: Short = 0, val name: String = "", val numRows: Long = 
     if (displayLayout) {
       print(" ")
       print(s"Layout:")
-      for (i <- rowLayout.indices) println(s"    ${i} ${rowLayout(i)}")
+      for (i <- workerLayout.indices) println(s"    ${i} ${workerLayout(i)}")
     }
 
     this

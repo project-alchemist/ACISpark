@@ -165,7 +165,7 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
 
     val numCols = colEnd - colStart + 1
 
-    new DenseVector(readMessage.readDouble(numCols.toInt))
+    new DenseVector(Array[Double](1.0,2.0,3.0))
   }
 
   def finishRequestArrayBlocks: this.type = {

@@ -165,7 +165,7 @@ object AlchemistSession {
         rows.foreach(row => {
           lazy val elements = row.vector.toArray
           val index: Long = row.index
-          workers(mh.rowLayout(index.toInt)).addSendArrayBlock(Array(index,index,0,elements.length-1), elements)
+          workers(mh.workerLayout(index.toInt)).addSendArrayBlock(Array(index,index,0,elements.length-1), elements)
         })
 
         workers.foreach(w => w._2.finishSendArrayBlocks.disconnectFromAlchemist)
@@ -203,14 +203,14 @@ object AlchemistSession {
 
         rows.foreach(row => {
           val index: Long = row.index
-          workers(mh.rowLayout(index.toInt)).addRequestedArrayBlock(Array(index,index,0,mh.numCols-1))
+          workers(mh.workerLayout(index.toInt)).addRequestedArrayBlock(Array(index,index,0,mh.numCols-1))
         })
 
         workers.foreach(w => w._2.finishRequestArrayBlocks)
 
         currentRowIter = rows.map(row => {
           val index: Long = row.index
-          new IndexedRow(index, workers(mh.rowLayout(index.toInt)).getRequestedArrayBlock(Array(index,index,0,mh.numCols-1)))
+          new IndexedRow(index, workers(mh.workerLayout(index.toInt)).getRequestedArrayBlock(Array(index,index,0,mh.numCols-1)))
         }).iterator
 
         workers.foreach(w => w._2.disconnectFromAlchemist)
