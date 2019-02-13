@@ -10,7 +10,6 @@ class Message() {
   var maxBodyLength: Int = 10000000
 
   val messageBuffer: ByteBuffer = ByteBuffer.allocate(headerLength + maxBodyLength).order(ByteOrder.BIG_ENDIAN)
-  val tempBuffer: ByteBuffer = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN)
 
   var clientID: Short = 0
   var sessionID: Short = 0
@@ -38,6 +37,8 @@ class Message() {
     currentDatatypeCountMax = 0
     currentDatatypeCountPos = headerLength+1
 
+    messageBuffer.asInstanceOf[Buffer].position(headerLength)
+
     readPos = headerLength
     writePos = headerLength
 
@@ -59,13 +60,13 @@ class Message() {
   }
 
   // Reading header
-  def readClientID: Short = ByteBuffer.wrap(messageBuffer.array.slice(0, 2)).order(ByteOrder.BIG_ENDIAN).getShort
+  def readClientID: Short = messageBuffer.getShort(0)
 
-  def readSessionID: Short = ByteBuffer.wrap(messageBuffer.array.slice(2, 4)).order(ByteOrder.BIG_ENDIAN).getShort
+  def readSessionID: Short = messageBuffer.getShort(2)
 
   def readCommandCode: Byte = messageBuffer.get(4)
 
-  def readBodyLength: Int = ByteBuffer.wrap(messageBuffer.array.slice(5, 9)).order(ByteOrder.BIG_ENDIAN).getInt
+  def readBodyLength: Int = messageBuffer.getInt(5)
 
   def readHeader: this.type = {
     clientID = readClientID
@@ -80,21 +81,21 @@ class Message() {
 
   // ======================================== Reading Data =============================================
 
-  def readNextDatatype: this.type = {
-
-    currentDatatypeCount = 0
-    currentDatatype = getByte
-    currentDatatypeCountMax = getInt
-
-    this
-  }
+//  def readNextDatatype: this.type = {
+//
+//    currentDatatypeCount = 0
+//    currentDatatype = getByte
+//    currentDatatypeCountMax = getInt
+//
+//    this
+//  }
 
   def eom: Boolean = {
-    if (readPos >= headerLength + bodyLength) return true
+    if (messageBuffer.asInstanceOf[Buffer].position >= headerLength + bodyLength) return true
     return false
   }
 
-  def previewNextDatatype: Byte = messageBuffer.get(readPos)
+  def previewNextDatatype: Byte = messageBuffer.get(messageBuffer.asInstanceOf[Buffer].position)
 
   def previewNextDatatypeCount: Int = ByteBuffer.wrap(messageBuffer.array.slice(readPos+1, readPos+5))
                                                 .order(ByteOrder.BIG_ENDIAN)
@@ -106,389 +107,356 @@ class Message() {
 
   def getCurrentDatatypeCount(): Int = currentDatatypeCountMax
 
-  def getByte: Byte = {
-
-    readPos += 1
-    messageBuffer.get(readPos-1)
-  }
-
-  def getByteArray(len: Int): Array[Byte] = {
-
-    readPos += len
-    ByteBuffer.wrap(messageBuffer.array.slice(readPos-len, readPos)).order(ByteOrder.BIG_ENDIAN).array()
-  }
-
-  def getChar: Char = {
-
-    readPos += 1
-    ByteBuffer.wrap(Array[Byte](0, messageBuffer.get(readPos-1))).order(ByteOrder.BIG_ENDIAN).getChar
-  }
-
-  def getShort: Short = {
-
-    readPos += 2
-    ByteBuffer.wrap(messageBuffer.array.slice(readPos-2, readPos)).order(ByteOrder.BIG_ENDIAN).getShort
-  }
-
-  def getInt: Int = {
-
-    readPos += 4
-    ByteBuffer.wrap(messageBuffer.array.slice(readPos-4, readPos)).order(ByteOrder.BIG_ENDIAN).getInt
-  }
-
-  def getLong: Long = {
-
-    readPos += 8
-    ByteBuffer.wrap(messageBuffer.array.slice(readPos-8, readPos)).order(ByteOrder.BIG_ENDIAN).getLong
-  }
-
-  def getFloat: Float = {
-
-    readPos += 4
-    ByteBuffer.wrap(messageBuffer.array.slice(readPos-4, readPos)).order(ByteOrder.BIG_ENDIAN).getFloat
-  }
-
-  def getDouble: Double = {
-
-    readPos += 8
-    ByteBuffer.wrap(messageBuffer.array.slice(readPos-8, readPos)).order(ByteOrder.BIG_ENDIAN).getDouble
-  }
-
-  def getString: String = {
-
-    val strLength: Int = getInt
-    new String(getByteArray(strLength), StandardCharsets.UTF_8)
-  }
-
-  def readByte(): Byte = {
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-
-    currentDatatypeCount += 1
-
-    getByte
+  def readByte: Byte = {
+    try {
+      validateDatatype(previewNextDatatype, Datatype.Byte)
+      messageBuffer.get
+      messageBuffer.get
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        0.asInstanceOf[Byte]
+      }
+    }
   }
 
   def readChar(): Char = {
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-
-    currentDatatypeCount += 1
-
-    getChar
+    try {
+      validateDatatype(previewNextDatatype, Datatype.Char)
+      messageBuffer.get
+      messageBuffer.get.asInstanceOf[Char]
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        0.asInstanceOf[Char]
+      }
+    }
   }
 
   def readShort(): Short = {
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-
-    currentDatatypeCount += 1
-
-    getShort
+    try {
+      validateDatatype(previewNextDatatype, Datatype.Short)
+      messageBuffer.get
+      messageBuffer.getShort
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        0.asInstanceOf[Short]
+      }
+    }
   }
 
   def readInt(): Int = {
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-
-    currentDatatypeCount += 1
-
-    getInt
+    try {
+      validateDatatype(previewNextDatatype, Datatype.Int)
+      messageBuffer.get
+      messageBuffer.getInt
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        0
+      }
+    }
   }
 
   def readLong(): Long = {
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-
-    currentDatatypeCount += 1
-
-    getLong
+    try {
+      validateDatatype(previewNextDatatype, Datatype.Long)
+      messageBuffer.get
+      messageBuffer.getLong
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        0.asInstanceOf[Long]
+      }
+    }
   }
 
   def readFloat(): Float = {
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-
-    currentDatatypeCount += 1
-
-    getFloat
+    try {
+      validateDatatype(previewNextDatatype, Datatype.Float)
+      messageBuffer.get
+      messageBuffer.getFloat
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        0.0.asInstanceOf[Float]
+      }
+    }
   }
 
   def readDouble(): Double = {
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-
-    currentDatatypeCount += 1
-
-    getDouble
+    try {
+      validateDatatype(previewNextDatatype, Datatype.Double)
+      messageBuffer.get
+      messageBuffer.getDouble
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        0.0
+      }
+    }
   }
-
-//  def readDouble(num: Int): Array[Double] = {
-//    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-//
-//    readPos += 8 * num
-//    currentDatatypeCount += num
-//    val vec = new Array[Double](num)
-//
-//    ByteBuffer.wrap(messageBuffer.array.slice(readPos - 8 * num, readPos))
-//      .order(ByteOrder.BIG_ENDIAN)
-//      .asDoubleBuffer()
-//      .get(vec)
-//
-//    vec
-//  }
 
   def readString: String = {
-
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-
-    currentDatatypeCount += 1
-
-    getString
+    try {
+      validateDatatype(previewNextDatatype, Datatype.String)
+      messageBuffer.get
+      getString
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        ""
+      }
+    }
   }
 
-  def readParameter: this.type = {
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-
-    this
+  def readParameter: Unit = {
+    try {
+      validateDatatype(previewNextDatatype, Datatype.Parameter)
+      messageBuffer.get
+    }
+    catch {
+      case e: InconsistentDatatypeException => println(e)
+    }
   }
 
   def readLibraryID: Byte = {
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-
-    currentDatatypeCount += 1
-
-    getByte
+    try {
+      validateDatatype(previewNextDatatype, Datatype.LibraryID)
+      messageBuffer.get
+      messageBuffer.get
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        0.asInstanceOf[Byte]
+      }
+    }
   }
 
   def readArrayID: Short = {
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-
-    currentDatatypeCount += 1
-
-    getShort
+    try {
+      validateDatatype(previewNextDatatype, Datatype.ArrayID)
+      messageBuffer.get
+      messageBuffer.get
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        0.asInstanceOf[Short]
+      }
+    }
   }
 
-  def readArrayInfo: ArrayHandle = {
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
+  def getByteArray(length: Int): Array[Byte] = {
+    val bb: Array[Byte] = ByteBuffer.allocate(length).order(ByteOrder.BIG_ENDIAN).array
+    messageBuffer.get(bb, 0, length)
+    bb
+  }
 
-    currentDatatypeCount += 1
-
-    getArrayInfo
+  def getString: String = {
+    val strLength: Int = messageBuffer.getInt
+    new String(getByteArray(strLength), StandardCharsets.UTF_8)
   }
 
   def getArrayInfo: ArrayHandle = {
-    val matrixID: Short = getShort
-    val nameLength: Int = getInt
+    val matrixID: Short = messageBuffer.getShort
+    val nameLength: Int = messageBuffer.getInt
     val name: String = getString
-    val numRows: Long = getLong
-    val numCols: Long = getLong
-    val sparse: Byte = getByte
-    val layout: Byte = getByte
-    val numPartitions: Byte = getByte
+    val numRows: Long = messageBuffer.getLong
+    val numCols: Long = messageBuffer.getLong
+    val sparse: Byte = messageBuffer.get
+    val layout: Byte = messageBuffer.get
+    val numPartitions: Byte = messageBuffer.get
     val workerLayout: Array[Byte] = getByteArray(numPartitions)
 
     new ArrayHandle(matrixID, name, numRows, numCols, sparse, numPartitions, workerLayout)
   }
 
-//  def getDoubleArray(pos: Long, length: Long): Array[Double] = {
-//    val vec = new Array[Double](num)
-//
-//    ByteBuffer.wrap(ByteBuffer.array.slice(readPos - 8 * blockSize, readPos))
-//      .order(ByteOrder.BIG_ENDIAN)
-//      .asDoubleBuffer()
-//      .get(vec)
-//  }
-
-  def fill2DArray[T : ClassTag](x: Array[Array[T]], rows: Array[Int], cols: Array[Int]): this.type = {
-    x match {
-      case _: Array[Array[Double]] => {
-        for (i <- rows(0) to rows(1) by rows(2))
-          for (j <- cols(0) to cols(1) by cols(2))
-            x(i.toInt)(j.toInt) = getDouble
-      }
-      case _: Array[Array[Int]] => {
-        for (i <- rows(0) to rows(1) by rows(2))
-          for (j <- cols(0) to cols(1) by cols(2))
-            x(i.toInt)(j.toInt) = getInt
+  def readArrayInfo: ArrayHandle = {
+    try {
+      validateDatatype(messageBuffer.get, Datatype.ArrayInfo)
+      getArrayInfo
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+        new ArrayHandle
       }
     }
+  }
+
+  def readArrayBlock: ArrayBlock = {
+    try {
+      validateDatatype(messageBuffer.get, Datatype.ArrayBlock)
+      val numDims: Int = messageBuffer.get.toInt
+
+      val nnz: Int = messageBuffer.getLong.toInt
+      val dims = Array.ofDim[Long](numDims, 3)
+      for (i <- 0 until numDims)
+        for (j <- 0 until 3)
+          dims(i)(j) = messageBuffer.getLong
+
+      val data = Array.fill[Double](nnz)(0.0)
+      (0 until nnz).foreach(i => data(i) = messageBuffer.getDouble)
+
+      new ArrayBlock(dims, data)
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+        new ArrayBlock
+      }
+    }
+
+  }
+
+  // ========================================= Writing Data =========================================
+
+  def start(clientID: Short, sessionID: Short, command: Command): this.type = {
+    reset
+    messageBuffer.putShort(0, clientID).putShort(2, sessionID).put(4, command.value)
 
     this
   }
 
-  def getArrayBlock[T : ClassTag](): ArrayBlock[T] = {
-    val numDims: Int = getByte.toInt
-
-    val nnz: Int = getLong.toInt
-    val dims = Array.ofDim[Long](numDims, 3)
-    for (i <- 0 until numDims)
-      for (j <- 0 until 3)
-        dims(i)(j) = getLong
-
-    val data = Array.fill[T](nnz)(0.0.asInstanceOf[T])
-    (0 until nnz).foreach(i => data(i) = getDouble.asInstanceOf[T])
-
-    new ArrayBlock[T](dims, data)
-  }
-
-  def readArrayBlock[T : ClassTag](): ArrayBlock[T] = {
-
-    if (readPos == headerLength | currentDatatypeCount == currentDatatypeCountMax) readNextDatatype
-    currentDatatypeCount += 1
-
-    getArrayBlock[T]
-  }
-
-
-  // ========================================= Writing Data =========================================
-
-  def start(clientID: Short, sessionID: Short, command: Command): this.type = reset.putShort(clientID, 0)
-                                                                                   .putShort(sessionID, 2)
-                                                                                   .putByte(command.value, 4)
 
   def addHeader(header: Array[Byte]): this.type = {
 
-    for (i <- 0 until 9) messageBuffer.put(i, header(i))
+    messageBuffer.put(header.slice(0, headerLength))
     readHeader
   }
 
   def addPacket(packet: Array[Byte], length: Int): this.type = {
 
-    for (i <- 0 until length) messageBuffer.put(writePos + i, packet(i))
-
-    writePos += length
+    messageBuffer.put(packet.slice(0, length))
 
     this
   }
 
-  // --------------------------------- Put data types into buffer ---------------------------------
+  // -------------------------------- Write data types into buffer --------------------------------
 
-  def putByte(value: Byte, pos: Int = writePos, buffer: ByteBuffer = messageBuffer): this.type = {
-
-    buffer.put(pos, value)
-    if (pos == writePos) writePos += 1
-
-    this
-  }
-
-  def putChar(value: Char, pos: Int = writePos, buffer: ByteBuffer = messageBuffer): this.type = {
-
-    buffer.put(pos, value.toByte)
-    if (pos == writePos) writePos += 1
+  def writeByte(value: Byte): this.type = {
+    messageBuffer.put(Datatype.Byte.value)
+                 .put(value)
 
     this
   }
 
-  def putShort(value: Short, pos: Int = writePos, buffer: ByteBuffer = messageBuffer): this.type = {
-
-    tempBuffer.asInstanceOf[Buffer].clear
-    val bb = tempBuffer.order(ByteOrder.BIG_ENDIAN).putShort(value).array
-
-    for (i <- 0 until 2) buffer.put(pos + i, bb(i))
-    if (pos == writePos) writePos += 2
+  def writeChar(value: Char): this.type = {
+    messageBuffer.put(Datatype.Char.value)
+                 .put(value.toByte)
 
     this
   }
 
-  def putInt(value: Int, pos: Int = writePos, buffer: ByteBuffer = messageBuffer): this.type = {
-
-    tempBuffer.asInstanceOf[Buffer].clear
-    val bb = tempBuffer.order(ByteOrder.BIG_ENDIAN).putInt(value).array
-
-    for (i <- 0 until 4) buffer.put(pos + i, bb(i))
-    if (pos == writePos) writePos += 4
+  def writeShort(value: Short): this.type = {
+    messageBuffer.put(Datatype.Short.value)
+                 .putShort(value)
 
     this
   }
 
-  def putLong(value: Long, pos: Int = writePos, buffer: ByteBuffer = messageBuffer): this.type = {
-
-    tempBuffer.asInstanceOf[Buffer].clear
-    val bb = tempBuffer.order(ByteOrder.BIG_ENDIAN).putLong(value).array
-
-    for (i <- 0 until 8) buffer.put(pos + i, bb(i))
-    if (pos == writePos) writePos += 8
+  def writeInt(value: Int): this.type = {
+    messageBuffer.put(Datatype.Int.value)
+                 .putInt(value)
 
     this
   }
 
-  def putFloat(value: Float, pos: Int = writePos, buffer: ByteBuffer = messageBuffer): this.type = {
-
-    tempBuffer.asInstanceOf[Buffer].clear
-    val bb = tempBuffer.order(ByteOrder.BIG_ENDIAN).putFloat(value).array
-
-    for (i <- 0 until 4) messageBuffer.put(pos + i, bb(i))
-    if (pos == writePos) writePos += 4
+  def writeLong(value: Long): this.type = {
+    messageBuffer.put(Datatype.Long.value)
+                 .putLong(value)
 
     this
   }
 
-  def putDouble(value: Double, pos: Int = writePos, buffer: ByteBuffer = messageBuffer): this.type = {
-
-    tempBuffer.asInstanceOf[Buffer].clear
-    val bb = tempBuffer.order(ByteOrder.BIG_ENDIAN).putDouble(value).array
-
-    for (i <- 0 until 8) buffer.put(pos + i, bb(i))
-    if (pos == writePos) writePos += 8
+  def writeFloat(value: Float): this.type = {
+    messageBuffer.put(Datatype.Float.value)
+                 .putFloat(value)
 
     this
   }
 
-  def putString(value: String, pos: Int = writePos, buffer: ByteBuffer = messageBuffer): this.type = {
-
-    val stringBuffer = value.getBytes(StandardCharsets.UTF_8)
-
-    for (i <- 0 until stringBuffer.size) buffer.put(pos + i, stringBuffer(i))
-    if (pos == writePos) writePos += stringBuffer.size
+  def writeDouble(value: Double): this.type = {
+    messageBuffer.put(Datatype.Double.value)
+                 .putDouble(value)
 
     this
   }
-
-  def putArrayBlock[T : ClassTag](block: ArrayBlock[T]): this.type = {
-
-    putByte(block.dims.size.toByte)
-    putLong(block.nnz)
-    block.dims.foreach(d1 => d1.foreach(d2 => putLong(d2)))
-    block.data.foreach(e => putDouble(e.asInstanceOf[Double]))
-
-    this
-  }
-
-  def writeByte(value: Byte): this.type = checkDatatype(Datatype.Byte).putByte(value)
-
-  def writeChar(value: Char): this.type = checkDatatype(Datatype.Char).putChar(value)
-
-  def writeShort(value: Short): this.type = checkDatatype(Datatype.Short).putShort(value)
-
-  def writeInt(value: Int): this.type = checkDatatype(Datatype.Int).putInt(value)
-
-  def writeLong(value: Long): this.type = checkDatatype(Datatype.Long).putLong(value)
-
-  def writeFloat(value: Float): this.type = checkDatatype(Datatype.Float).putFloat(value)
-
-  def writeDouble(value: Double): this.type = checkDatatype(Datatype.Double).putDouble(value)
 
   def writeString(value: String): this.type = {
-    println(s"wr str $value")
+    messageBuffer.put(Datatype.String.value)
+                 .putInt(value.length)
+                 .put(value.getBytes(StandardCharsets.UTF_8).array)
 
-    checkDatatype(Datatype.String).putInt(value.length)
-      .putString(value)
+    this
   }
 
-  def writeLibraryID(value: Byte): this.type = checkDatatype(Datatype.LibraryID).putByte(value)
+  def writeLibraryID(value: Byte): this.type = {
+    messageBuffer.put(Datatype.LibraryID.value)
+                 .put(value)
 
-  def writeArrayID(value: Short): this.type = checkDatatype(Datatype.ArrayID).putShort(value)
+    this
+  }
 
-  def writeArrayBlock[T : ClassTag](block: ArrayBlock[T]): this.type = checkDatatype(Datatype.ArrayBlock).putArrayBlock(block)
+  def writeArrayID(value: Short): this.type = {
+    messageBuffer.put(Datatype.ArrayID.value)
+                 .putShort(value)
 
-  def writeParameter(): this.type = checkDatatype(Datatype.Parameter)
+    this
+  }
+
+  def writeArrayBlock(block: ArrayBlock): this.type = {
+    messageBuffer.put(Datatype.ArrayBlock.value)
+                 .put(block.dims.size.toByte)
+                 .putLong(block.nnz)
+    block.dims.foreach(d1 => d1.foreach(d2 => messageBuffer.putLong(d2)))
+    block.data.foreach(e => messageBuffer.putDouble(e))
+
+    this
+  }
+
+  def writeParameter(): this.type = {
+    messageBuffer.put(Datatype.Parameter.value)
+
+    this
+  }
 
   // ========================================================================================
+
+  @throws(classOf[InconsistentDatatypeException])
+  def validateDatatype(code: Byte, datatype: Datatype): Unit = {
+    if (code != datatype.value) {
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${datatype.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+  }
 
   def checkDatatype(datatype: Datatype): this.type = {
 
     if (currentDatatype != datatype.value) {
       currentDatatype = datatype.value
 
-      updateDatatypeCount.putByte(currentDatatype)
+      updateDatatypeCount
+      messageBuffer.put(currentDatatype)
 
       currentDatatypeCount = 1
       currentDatatypeCountPos = writePos
       writePos += 4
+
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position+4)
     }
     else currentDatatypeCount += 1
 
@@ -496,14 +464,20 @@ class Message() {
   }
 
   def updateBodyLength: this.type = {
-    bodyLength = writePos - headerLength
-    putInt(bodyLength, 5)
+    bodyLength = messageBuffer.asInstanceOf[Buffer].position - headerLength
+    messageBuffer.putInt(5, bodyLength)
+
+    this
   }
 
-  def updateDatatypeCount: this.type = putInt(currentDatatypeCount, currentDatatypeCountPos)
+  def updateDatatypeCount: this.type = {
+    messageBuffer.putInt(currentDatatypeCountPos, currentDatatypeCount)
+
+    this
+  }
 
   def finish(): Array[Byte] = {
-    updateBodyLength.updateDatatypeCount
+    updateBodyLength
 
     messageBuffer.array.slice(0, headerLength + bodyLength)
   }
@@ -513,9 +487,9 @@ class Message() {
   def print: this.type = {
 
     val space: String = "                                              "
-    var data: String = ""
 
     readHeader
+    messageBuffer.asInstanceOf[Buffer].position(headerLength)
 
     System.out.println()
     System.out.println(s"$space ==================================================================")
@@ -527,30 +501,26 @@ class Message() {
     System.out.println(" ")
 
     while (!eom) {
-      readNextDatatype
+      currentDatatype = previewNextDatatype
 
-      println(s"$space Datatype (length):    ${Datatype.withValue(currentDatatype).label} ($currentDatatypeCountMax)")
+      var data: String = f"$space ${Datatype.withValue(currentDatatype).label}%-15s      "
 
-      data = ""
-
-      for (j <- 0 until currentDatatypeCountMax) {
-        currentDatatype match {
-          case Datatype.Byte.value => data = data.concat(s" ${getByte} ")
-          case Datatype.Char.value => data = data.concat(s" ${getChar} ")
-          case Datatype.Short.value => data = data.concat(s" ${getShort} ")
-          case Datatype.Int.value => data = data.concat(s" ${getInt} ")
-          case Datatype.Long.value => data = data.concat(s" ${getLong} ")
-          case Datatype.Float.value => data = data.concat(s" ${getFloat} ")
-          case Datatype.Double.value => data = data.concat(s" ${getDouble} ")
-          case Datatype.String.value => data = data.concat(s" ${getString} ")
-          case Datatype.LibraryID.value => data = data.concat(s" ${getByte} ")
-          case Datatype.ArrayID.value => data = data.concat(s" ${getShort} ")
-          case Datatype.ArrayInfo.value => data = data.concat(s" ${getArrayInfo.toString}")
-          case Datatype.ArrayBlock.value => data = data.concat(s" ${getArrayBlock[Double].toString(space + "                       ")}")
-        }
+      currentDatatype match {
+        case Datatype.Byte.value => data = data.concat(s" ${readByte} ")
+        case Datatype.Char.value => data = data.concat(s" ${readChar} ")
+        case Datatype.Short.value => data = data.concat(s" ${readShort} ")
+        case Datatype.Int.value => data = data.concat(s" ${readInt} ")
+        case Datatype.Long.value => data = data.concat(s" ${readLong} ")
+        case Datatype.Float.value => data = data.concat(s" ${readFloat} ")
+        case Datatype.Double.value => data = data.concat(s" ${readDouble} ")
+        case Datatype.String.value => data = data.concat(s" ${readString} ")
+        case Datatype.LibraryID.value => data = data.concat(s" ${readByte} ")
+        case Datatype.ArrayID.value => data = data.concat(s" ${readShort} ")
+        case Datatype.ArrayInfo.value => data = data.concat(s" ${readArrayInfo.toString}")
+        case Datatype.ArrayBlock.value => data = data.concat(s" ${readArrayBlock.toString(space + "                       ")}")
       }
 
-      System.out.println(s"$space Data:                $data\n")
+      System.out.println(s"$data")
     }
 
     reset

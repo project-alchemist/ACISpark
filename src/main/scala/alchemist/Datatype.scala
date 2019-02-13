@@ -46,9 +46,10 @@ private[alchemist] object Datatype extends ByteEnum[Datatype] {
   final case object String extends Datatype(46, "STRING")
 
   final case object CommandCode extends Datatype(48, "COMMAND CODE")
-  final case object Parameter extends Datatype(49, "PARAMETER")
-  final case object LibraryID extends Datatype(50, "LIBRARY ID")
-  final case object ArrayID extends Datatype(51, "ARRAY ID")
-  final case object ArrayInfo extends Datatype(52, "ARRAY INFO")
-  final case object ArrayBlock extends Datatype(53, "ARRAY BLOCK")
+  final case object LibraryID extends Datatype(49, "LIBRARY ID")
+  final case object ArrayID extends Datatype(50, "ARRAY ID")
+  final case object ArrayInfo extends Datatype(51, "ARRAY INFO")
+  final case object ArrayBlock extends Datatype(52, "ARRAY BLOCK")
+
+  final case object Parameter extends Datatype(100, "PARAMETER")
 }

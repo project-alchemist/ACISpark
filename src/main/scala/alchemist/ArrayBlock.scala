@@ -1,8 +1,7 @@
 package alchemist
 
-import scala.reflect.ClassTag
-
-class ArrayBlock[T : ClassTag](val dims: Array[Array[Long]], val data: Array[T]) {
+class ArrayBlock(val dims: Array[Array[Long]] = Array.empty[Array[Long]],
+                               val data: Array[Double] = Array.empty[Double]) {
 
   val nnz: Long = data.size.toLong
 
@@ -12,7 +11,7 @@ class ArrayBlock[T : ClassTag](val dims: Array[Array[Long]], val data: Array[T])
     var size: Long = 1l
     dims.foreach(dim => size *= (dim(1) - dim(0) + 1l))
 
-    val tempData = Array.fill[T](size.toInt)(0.0.asInstanceOf[T]).grouped((dims(1)(1)-dims(1)(0)+1).toInt).toArray
+    val tempData = Array.fill[Double](size.toInt)(0.0.asInstanceOf[Double]).grouped((dims(1)(1)-dims(1)(0)+1).toInt).toArray
 
     for (i <- dims(0)(0) to dims(0)(1) by dims(0)(2)) {
       for (j <- dims(1)(0) to dims(1)(1) by dims(1)(2))

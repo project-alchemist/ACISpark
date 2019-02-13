@@ -91,7 +91,7 @@ class DriverClient {          // Connects to the Alchemist driver
     in.read(header, 0, 9)
 
     readMessage.reset
-    readMessage.addHeader(header)
+               .addHeader(header)
 
     var remainingBodyLength: Int = readMessage.readBodyLength
 
@@ -140,18 +140,18 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def handshake: Boolean = {
 
-    writeMessage.start(0, 0, Command.Handshake)
-
-    writeMessage.writeByte(2)
-    writeMessage.writeShort(1234)
-    writeMessage.writeString("ABCD")
-    writeMessage.writeDouble(1.11)
-    writeMessage.writeDouble(2.22)
-    val testArray: ArrayBlock[Double] = new ArrayBlock[Double](
+    val testArray: ArrayBlock = new ArrayBlock(
       Array[Long](0l, 3l, 1l, 0l, 2l, 1l).grouped(3).toArray,
       (for {r <- 3 to 14} yield 1.11*r).toArray
     )
-    writeMessage.writeArrayBlock(testArray)
+
+    writeMessage.start(0, 0, Command.Handshake)
+                .writeByte(2)
+                .writeShort(1234)
+                .writeString("ABCD")
+                .writeDouble(1.11)
+                .writeDouble(2.22)
+                .writeArrayBlock(testArray)
 
     sendMessage
 
@@ -187,8 +187,8 @@ class DriverClient {          // Connects to the Alchemist driver
   def clientInfo(numWorkers: Byte, logDir: String): this.type = {
 
     writeMessage.start(clientID, sessionID, Command.ClientInfo)
-    writeMessage.writeShort(numWorkers)
-    writeMessage.writeString(logDir)
+                .writeShort(numWorkers)
+                .writeString(logDir)
 
     sendMessage
 
@@ -202,7 +202,7 @@ class DriverClient {          // Connects to the Alchemist driver
   def sendTestString(testString: String): String = {
 
     writeMessage.start(clientID, sessionID, Command.SendTestString)
-    writeMessage.writeString(testString)
+                .writeString(testString)
 
     sendMessage
 
@@ -223,11 +223,11 @@ class DriverClient {          // Connects to the Alchemist driver
     println(s"Requesting $numWorkers Alchemist workers")
 
     writeMessage.start(clientID, sessionID, Command.RequestWorkers)
-    writeMessage.writeShort(numWorkers)
+                .writeShort(numWorkers)
 
     sendMessage
 
-    val numAssignedWorkers: Byte = readMessage.readByte()
+    val numAssignedWorkers: Byte = readMessage.readByte
 
 
 //    var workerClients: Array[WorkerClient] = Array.empty[WorkerClient]
@@ -259,18 +259,16 @@ class DriverClient {          // Connects to the Alchemist driver
 
     val message: String = readMessage.readString
 
-    println(message)
-
     yieldedWorkers
   }
 
   def sendArrayInfo(numRows: Long, numCols: Long): ArrayHandle = {
 
     writeMessage.start(clientID, sessionID, Command.ArrayInfo)
-    writeMessage.writeByte(0)        // Type: dense
-    writeMessage.writeByte(0)        // Layout: by rows (default)
-    writeMessage.writeLong(numRows)         // Number of rows
-    writeMessage.writeLong(numCols)         // Number of columns
+                .writeByte(0)        // Type: dense
+                .writeByte(0)        // Layout: by rows (default)
+                .writeLong(numRows)         // Number of rows
+                .writeLong(numCols)         // Number of columns
 
     sendMessage
 
