@@ -24,7 +24,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   var ID: Short = _
 
-  var driverProc: Process = _
+//  var driverProc: Process = _
 
   var clientID: Short = 0
   var sessionID: Short = 0
@@ -44,11 +44,11 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def connect(address: String, port: Int): Boolean = {
 
-    val pb = new ProcessBuilder("true")
-
-    driverProc = pb.redirectError(ProcessBuilder.Redirect.INHERIT)
-      .redirectOutput(ProcessBuilder.Redirect.INHERIT)
-      .start
+//    val pb = new ProcessBuilder("true")
+//
+//    driverProc = pb.redirectError(ProcessBuilder.Redirect.INHERIT)
+//      .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+//      .start
 
     try {
       sock = new Socket(address, port)
@@ -206,13 +206,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
     sendMessage
 
-    var responseString: String = ""
-
-    if (readMessage.readCommandCode == 4) {
-      responseString = readMessage.readString
-    }
-
-    responseString
+    readMessage.readString
   }
 
   def requestTestString: String = {
@@ -221,13 +215,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
     sendMessage
 
-    var testString: String = ""
-
-    if (readMessage.readCommandCode == 4) {
-      testString = readMessage.readString
-    }
-
-    testString
+    readMessage.readString
   }
 
   def requestWorkers(numWorkers: Byte): Map[Byte, WorkerClient] = {
@@ -309,6 +297,7 @@ class DriverClient {          // Connects to the Alchemist driver
   def listAllWorkers(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, Command.ListAllWorkers)
+                .writeString(preamble)
 
     sendMessage
   }
@@ -316,6 +305,7 @@ class DriverClient {          // Connects to the Alchemist driver
   def listActiveWorkers(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, Command.ListActiveWorkers)
+                .writeString(preamble)
 
     sendMessage
   }
@@ -323,6 +313,7 @@ class DriverClient {          // Connects to the Alchemist driver
   def listInactiveWorkers(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, Command.ListInactiveWorkers)
+                .writeString(preamble)
 
     sendMessage
   }
@@ -330,13 +321,16 @@ class DriverClient {          // Connects to the Alchemist driver
   def listAssignedWorkers(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, Command.ListAssignedWorkers)
+                .writeString(preamble)
 
     sendMessage
   }
 
-  def loadLibrary(preamble: String): this.type = {
+  def loadLibrary(name: String, path: String): this.type = {
 
     writeMessage.start(clientID, sessionID, Command.LoadLibrary)
+                .writeString(name)
+                .writeString(path)
 
     sendMessage
   }

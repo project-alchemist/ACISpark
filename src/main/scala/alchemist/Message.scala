@@ -462,8 +462,12 @@ class Message() {
 
   def writeDouble(value: Double): this.type = checkDatatype(Datatype.Double).putDouble(value)
 
-  def writeString(value: String): this.type = checkDatatype(Datatype.String).putInt(value.length)
-                                                                            .putString(value)
+  def writeString(value: String): this.type = {
+    println(s"wr str $value")
+
+    checkDatatype(Datatype.String).putInt(value.length)
+      .putString(value)
+  }
 
   def writeLibraryID(value: Byte): this.type = checkDatatype(Datatype.LibraryID).putByte(value)
 
@@ -517,7 +521,7 @@ class Message() {
     System.out.println(s"$space ==================================================================")
     System.out.println(s"$space Client ID:            $clientID")
     System.out.println(s"$space Session ID:           $sessionID")
-    System.out.println(s"$space Command code:         $commandCode")// (${Command.withValue(tempCommandCode).entryName})
+    System.out.println(s"$space Command code:         $commandCode (${Command.withValue(commandCode).label})")
     System.out.println(s"$space Message body length:  $bodyLength")
     System.out.println(s"$space ------------------------------------------------------------------")
     System.out.println(" ")

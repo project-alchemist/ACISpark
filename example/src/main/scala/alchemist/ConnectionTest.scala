@@ -22,5 +22,13 @@ object ConnectionTest {
       .listInactiveWorkers("    ")
       .listActiveWorkers("    ")
       .listAssignedWorkers("    ")
+      .requestWorkers(2)
+      .listAllWorkers("    ")
+      .listInactiveWorkers("    ")
+      .listActiveWorkers("    ")
+      .listAssignedWorkers("    ")
+      .sendTestString
+
+    als.loadLibrary("TestLib", "/Users/kai/Projects/AlLib/target/testlib.dylib", "libs/testlib-assembly-0.1.jar")
   }
 }

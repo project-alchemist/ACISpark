@@ -63,9 +63,6 @@ object AlchemistSession {
 //  val instance: Any = classToLoad.newInstance
 //  val result: Any = method.invoke(instance)
 
-  def loadLib(name: String, jarName: String) = new java.net.URLClassLoader(
-    Array(new File("lib/" + jarName).toURI.toURL),
-    this.getClass.getClassLoader)
 
   def createRandomRDD(nRows: Int, nCols: Int, ss: SparkSession): RDD[Array[Array[Double]]] = {
     val randomArray = Array.ofDim[Double](nRows,nCols)
@@ -80,9 +77,17 @@ object AlchemistSession {
     ss.sparkContext.parallelize(Seq(randomArray))
   }
 
-  def loadLibrary(name: String): String = {
+  def loadLibrary(name: String, path: String, jar: String): this.type = {
     println(s"Loading library $name")
-    return name
+    driver.loadLibrary(name, path)
+
+    var classLoader = new java.net.URLClassLoader(
+      Array(new File(jar).toURI.toURL),
+      this.getClass.getClassLoader)
+
+    var c = classLoader.loadClass(s"${name.toLowerCase}.${name}")
+
+    this
   }
 
   def connect(_address: String = "", _port: Int = 0): this.type = {
@@ -227,13 +232,14 @@ object AlchemistSession {
   def getArrayHandle(mat: RowMatrix): ArrayHandle = driver.sendArrayInfo(mat.numRows, mat.numCols)
 
 
-  def sendTestString(): this.type = {
+  def sendTestString: this.type = {
     println("Sending test string to Alchemist")
+    driver.sendTestString("This is a test string from ACISpark")
 
     this
   }
 
-  def requestTestString(): this.type = {
+  def requestTestString: this.type = {
     println("Requesting test string from Alchemist")
     println(s"Received test string '${driver.requestTestString}'")
 
