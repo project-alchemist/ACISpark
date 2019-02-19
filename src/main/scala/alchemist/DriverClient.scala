@@ -85,15 +85,15 @@ class DriverClient {          // Connects to the Alchemist driver
 
     val in = sock.getInputStream
 
-    val header: Array[Byte] = Array.fill[Byte](9)(0)
+    val header: Array[Byte] = Array.fill[Byte](readMessage.headerLength)(0)
     val packet: Array[Byte] = Array.fill[Byte](8192)(0)
 
-    in.read(header, 0, 9)
+    in.read(header, 0, readMessage.headerLength)
 
     readMessage.reset
                .addHeader(header)
 
-    var remainingBodyLength: Int = readMessage.readBodyLength
+    var remainingBodyLength: Int = readMessage.bodyLength
 
     while (remainingBodyLength > 0) {
       val length: Int = Array(remainingBodyLength, 8192).min
@@ -140,7 +140,7 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def handshake: Boolean = {
 
-    val testArray: ArrayBlock = new ArrayBlock(
+    val testArray: ArrayBlockDouble = new ArrayBlockDouble(
       Array[Long](0l, 3l, 1l, 0l, 2l, 1l).grouped(3).toArray,
       (for {r <- 3 to 14} yield 1.11*r).toArray
     )
@@ -151,7 +151,7 @@ class DriverClient {          // Connects to the Alchemist driver
                 .writeString("ABCD")
                 .writeDouble(1.11)
                 .writeDouble(2.22)
-                .writeArrayBlock(testArray)
+                .writeArrayBlockDouble(testArray)
 
     sendMessage
 

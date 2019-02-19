@@ -156,12 +156,12 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
   def getRequestedArrayBlock(blockRange: Array[Long]): DenseVector = {
 
     if (readMessage.readPos == readMessage.headerLength)
-      readMessage.readShort()
+      readMessage.readShort
 
-    val rowStart = readMessage.readLong()
-    val rowEnd = readMessage.readLong()
-    val colStart = readMessage.readLong()
-    val colEnd = readMessage.readLong()
+    val rowStart = readMessage.readLong
+    val rowEnd = readMessage.readLong
+    val colStart = readMessage.readLong
+    val colEnd = readMessage.readLong
 
     val numCols = colEnd - colStart + 1
 

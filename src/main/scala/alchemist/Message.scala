@@ -6,7 +6,7 @@ import java.nio.charset.StandardCharsets
 
 class Message() {
 
-  val headerLength: Int = 9
+  val headerLength: Int = 10
   var maxBodyLength: Int = 10000000
 
   val messageBuffer: ByteBuffer = ByteBuffer.allocate(headerLength + maxBodyLength).order(ByteOrder.BIG_ENDIAN)
@@ -14,6 +14,7 @@ class Message() {
   var clientID: Short = 0
   var sessionID: Short = 0
   var commandCode: Byte = Command.Wait.value
+  var errorCode: Byte = Error.None.value
   var bodyLength: Int = 0
 
   // For writing data
@@ -30,6 +31,7 @@ class Message() {
     clientID = 0
     sessionID = 0
     commandCode = Command.Wait.value
+    errorCode = Error.None.value
     bodyLength = 0
 
     currentDatatype = Datatype.None.value
@@ -66,12 +68,15 @@ class Message() {
 
   def readCommandCode: Byte = messageBuffer.get(4)
 
-  def readBodyLength: Int = messageBuffer.getInt(5)
+  def readErrorCode: Byte = messageBuffer.get(5)
+
+  def readBodyLength: Int = messageBuffer.getInt(6)
 
   def readHeader: this.type = {
     clientID = readClientID
     sessionID = readSessionID
     commandCode = readCommandCode
+    errorCode = readErrorCode
     bodyLength = readBodyLength
     readPos = headerLength
     writePos = headerLength
@@ -121,7 +126,7 @@ class Message() {
     }
   }
 
-  def readChar(): Char = {
+  def readChar: Char = {
     try {
       validateDatatype(previewNextDatatype, Datatype.Char)
       messageBuffer.get
@@ -135,7 +140,7 @@ class Message() {
     }
   }
 
-  def readShort(): Short = {
+  def readShort: Short = {
     try {
       validateDatatype(previewNextDatatype, Datatype.Short)
       messageBuffer.get
@@ -149,7 +154,7 @@ class Message() {
     }
   }
 
-  def readInt(): Int = {
+  def readInt: Int = {
     try {
       validateDatatype(previewNextDatatype, Datatype.Int)
       messageBuffer.get
@@ -163,7 +168,7 @@ class Message() {
     }
   }
 
-  def readLong(): Long = {
+  def readLong: Long = {
     try {
       validateDatatype(previewNextDatatype, Datatype.Long)
       messageBuffer.get
@@ -177,7 +182,7 @@ class Message() {
     }
   }
 
-  def readFloat(): Float = {
+  def readFloat: Float = {
     try {
       validateDatatype(previewNextDatatype, Datatype.Float)
       messageBuffer.get
@@ -191,7 +196,7 @@ class Message() {
     }
   }
 
-  def readDouble(): Double = {
+  def readDouble: Double = {
     try {
       validateDatatype(previewNextDatatype, Datatype.Double)
       messageBuffer.get
@@ -243,16 +248,62 @@ class Message() {
     }
   }
 
+  def getArrayID: Short = {
+    messageBuffer.get
+  }
+
+  def getWorkerID: Short = {
+    messageBuffer.getShort
+  }
+
   def readArrayID: Short = {
     try {
       validateDatatype(previewNextDatatype, Datatype.ArrayID)
       messageBuffer.get
-      messageBuffer.get
+      getArrayID
     }
     catch {
       case e: InconsistentDatatypeException => {
         println(e)
         0.asInstanceOf[Short]
+      }
+    }
+  }
+
+  def readWorkerID: Short = {
+    try {
+      validateDatatype(previewNextDatatype, Datatype.WorkerID)
+      messageBuffer.get
+      getWorkerID
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        0.asInstanceOf[Short]
+      }
+    }
+  }
+
+  def getWorkerInfo: WorkerInfo = {
+    val workerID: Short = getWorkerID
+    val hostname: String = getString
+    val address: String = getString
+    val port: Short = messageBuffer.getShort
+    val groupID: Short = messageBuffer.getShort
+
+    new WorkerInfo(workerID, hostname, address, port, groupID)
+  }
+
+  def readWorkerInfo: WorkerInfo = {
+    try {
+      validateDatatype(messageBuffer.get, Datatype.WorkerInfo)
+      getWorkerInfo
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+        new WorkerInfo
       }
     }
   }
@@ -264,12 +315,12 @@ class Message() {
   }
 
   def getString: String = {
-    val strLength: Int = messageBuffer.getInt
-    new String(getByteArray(strLength), StandardCharsets.UTF_8)
+    val strLength: Short = messageBuffer.getShort
+    new String(getByteArray(strLength.asInstanceOf[Int]), StandardCharsets.UTF_8)
   }
 
   def getArrayInfo: ArrayHandle = {
-    val matrixID: Short = messageBuffer.getShort
+    val ID: Short = getArrayID
     val nameLength: Int = messageBuffer.getInt
     val name: String = getString
     val numRows: Long = messageBuffer.getLong
@@ -279,7 +330,7 @@ class Message() {
     val numPartitions: Byte = messageBuffer.get
     val workerLayout: Array[Byte] = getByteArray(numPartitions)
 
-    new ArrayHandle(matrixID, name, numRows, numCols, sparse, numPartitions, workerLayout)
+    new ArrayHandle(ID, name, numRows, numCols, sparse, numPartitions, workerLayout)
   }
 
   def readArrayInfo: ArrayHandle = {
@@ -296,9 +347,35 @@ class Message() {
     }
   }
 
-  def readArrayBlock: ArrayBlock = {
+  def readArrayBlockFloat: ArrayBlockFloat = {
     try {
-      validateDatatype(messageBuffer.get, Datatype.ArrayBlock)
+      validateDatatype(messageBuffer.get, Datatype.ArrayBlockFloat)
+      val numDims: Int = messageBuffer.get.toInt
+
+      val nnz: Int = messageBuffer.getLong.toInt
+      val dims = Array.ofDim[Long](numDims, 3)
+      for (i <- 0 until numDims)
+        for (j <- 0 until 3)
+          dims(i)(j) = messageBuffer.getLong
+
+      val data = Array.fill[Float](nnz)(0.0.asInstanceOf[Float])
+      (0 until nnz).foreach(i => data(i) = messageBuffer.getFloat)
+
+      new ArrayBlockFloat(dims, data)
+    }
+    catch {
+      case e: InconsistentDatatypeException => {
+        println(e)
+        messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+        new ArrayBlockFloat
+      }
+    }
+
+  }
+
+  def readArrayBlockDouble: ArrayBlockDouble = {
+    try {
+      validateDatatype(messageBuffer.get, Datatype.ArrayBlockDouble)
       val numDims: Int = messageBuffer.get.toInt
 
       val nnz: Int = messageBuffer.getLong.toInt
@@ -310,13 +387,13 @@ class Message() {
       val data = Array.fill[Double](nnz)(0.0)
       (0 until nnz).foreach(i => data(i) = messageBuffer.getDouble)
 
-      new ArrayBlock(dims, data)
+      new ArrayBlockDouble(dims, data)
     }
     catch {
       case e: InconsistentDatatypeException => {
         println(e)
         messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
-        new ArrayBlock
+        new ArrayBlockDouble
       }
     }
 
@@ -326,7 +403,10 @@ class Message() {
 
   def start(clientID: Short, sessionID: Short, command: Command): this.type = {
     reset
-    messageBuffer.putShort(0, clientID).putShort(2, sessionID).put(4, command.value)
+    messageBuffer.putShort(0, clientID)
+                 .putShort(2, sessionID)
+                 .put(4, command.value)
+                 .put(5, Error.None.value)
 
     this
   }
@@ -334,7 +414,9 @@ class Message() {
 
   def addHeader(header: Array[Byte]): this.type = {
 
+    messageBuffer.asInstanceOf[Buffer].position(0)
     messageBuffer.put(header.slice(0, headerLength))
+    messageBuffer.asInstanceOf[Buffer].position(headerLength)
     readHeader
   }
 
@@ -398,7 +480,7 @@ class Message() {
 
   def writeString(value: String): this.type = {
     messageBuffer.put(Datatype.String.value)
-                 .putInt(value.length)
+                 .putShort(value.length.asInstanceOf[Short])
                  .put(value.getBytes(StandardCharsets.UTF_8).array)
 
     this
@@ -418,8 +500,18 @@ class Message() {
     this
   }
 
-  def writeArrayBlock(block: ArrayBlock): this.type = {
-    messageBuffer.put(Datatype.ArrayBlock.value)
+  def writeArrayBlockFloat(block: ArrayBlockFloat): this.type = {
+    messageBuffer.put(Datatype.ArrayBlockFloat.value)
+      .put(block.dims.size.toByte)
+      .putLong(block.nnz)
+    block.dims.foreach(d1 => d1.foreach(d2 => messageBuffer.putLong(d2)))
+    block.data.foreach(e => messageBuffer.putFloat(e))
+
+    this
+  }
+
+  def writeArrayBlockDouble(block: ArrayBlockDouble): this.type = {
+    messageBuffer.put(Datatype.ArrayBlockDouble.value)
                  .put(block.dims.size.toByte)
                  .putLong(block.nnz)
     block.dims.foreach(d1 => d1.foreach(d2 => messageBuffer.putLong(d2)))
@@ -465,7 +557,7 @@ class Message() {
 
   def updateBodyLength: this.type = {
     bodyLength = messageBuffer.asInstanceOf[Buffer].position - headerLength
-    messageBuffer.putInt(5, bodyLength)
+    messageBuffer.putInt(6, bodyLength)
 
     this
   }
@@ -493,37 +585,41 @@ class Message() {
 
     System.out.println()
     System.out.println(s"$space ==================================================================")
-    System.out.println(s"$space Client ID:            $clientID")
-    System.out.println(s"$space Session ID:           $sessionID")
-    System.out.println(s"$space Command code:         $commandCode (${Command.withValue(commandCode).label})")
-    System.out.println(s"$space Message body length:  $bodyLength")
+    System.out.println(s"$space Client ID:                 $clientID")
+    System.out.println(s"$space Session ID:                $sessionID")
+    System.out.println(s"$space Command code:              $commandCode (${Command.withValue(commandCode).label})")
+    System.out.println(s"$space Error code:                $errorCode (${Error.withValue(errorCode).label})")
+    System.out.println(s"$space Message body length:       $bodyLength")
     System.out.println(s"$space ------------------------------------------------------------------")
     System.out.println(" ")
 
     while (!eom) {
       currentDatatype = previewNextDatatype
 
-      var data: String = f"$space ${Datatype.withValue(currentDatatype).label}%-15s      "
+      var data: String = f"$space ${Datatype.withValue(currentDatatype).label}%-20s      "
 
       currentDatatype match {
-        case Datatype.Byte.value => data = data.concat(s" ${readByte} ")
-        case Datatype.Char.value => data = data.concat(s" ${readChar} ")
-        case Datatype.Short.value => data = data.concat(s" ${readShort} ")
-        case Datatype.Int.value => data = data.concat(s" ${readInt} ")
-        case Datatype.Long.value => data = data.concat(s" ${readLong} ")
-        case Datatype.Float.value => data = data.concat(s" ${readFloat} ")
-        case Datatype.Double.value => data = data.concat(s" ${readDouble} ")
-        case Datatype.String.value => data = data.concat(s" ${readString} ")
-        case Datatype.LibraryID.value => data = data.concat(s" ${readByte} ")
-        case Datatype.ArrayID.value => data = data.concat(s" ${readShort} ")
+        case Datatype.Byte.value => data = data.concat(s" $readByte ")
+        case Datatype.Char.value => data = data.concat(s" $readChar ")
+        case Datatype.Short.value => data = data.concat(s" $readShort ")
+        case Datatype.Int.value => data = data.concat(s" $readInt ")
+        case Datatype.Long.value => data = data.concat(s" $readLong ")
+        case Datatype.Float.value => data = data.concat(s" $readFloat ")
+        case Datatype.Double.value => data = data.concat(s" $readDouble ")
+        case Datatype.String.value => data = data.concat(s" $readString ")
+        case Datatype.LibraryID.value => data = data.concat(s" $readLibraryID ")
+        case Datatype.WorkerID.value => data = data.concat(s" $readWorkerID ")
+        case Datatype.WorkerInfo.value => data = data.concat(s" ${readWorkerInfo.toString}")
+        case Datatype.ArrayID.value => data = data.concat(s" ${readArrayID} ")
         case Datatype.ArrayInfo.value => data = data.concat(s" ${readArrayInfo.toString}")
-        case Datatype.ArrayBlock.value => data = data.concat(s" ${readArrayBlock.toString(space + "                       ")}")
+        case Datatype.ArrayBlockFloat.value => data = data.concat(s" ${readArrayBlockFloat.toString(space + "                            ")}")
+        case Datatype.ArrayBlockDouble.value => data = data.concat(s" ${readArrayBlockDouble.toString(space + "                            ")}")
       }
 
       System.out.println(s"$data")
     }
 
-    reset
+    messageBuffer.asInstanceOf[Buffer].position(headerLength)
 
     System.out.println(s"$space ==================================================================")
 
