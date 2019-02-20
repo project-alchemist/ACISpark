@@ -17,15 +17,6 @@ class Message() {
   var errorCode: Byte = Error.None.value
   var bodyLength: Int = 0
 
-  // For writing data
-  var currentDatatype: Byte = Datatype.None.value
-  var currentDatatypeCount: Int = 0
-  var currentDatatypeCountMax: Int = 0
-  var currentDatatypeCountPos: Int = headerLength+1
-
-  var readPos: Int = headerLength     // for reading data
-  var writePos: Int = headerLength    // for writing body data
-
   def reset(): this.type = {
 
     clientID = 0
@@ -34,15 +25,7 @@ class Message() {
     errorCode = Error.None.value
     bodyLength = 0
 
-    currentDatatype = Datatype.None.value
-    currentDatatypeCount = 0
-    currentDatatypeCountMax = 0
-    currentDatatypeCountPos = headerLength+1
-
     messageBuffer.asInstanceOf[Buffer].position(headerLength)
-
-    readPos = headerLength
-    writePos = headerLength
 
     this
   }
@@ -56,7 +39,7 @@ class Message() {
 
   // Return raw byte array
   def get: this.type = {
-    updateBodyLength.updateDatatypeCount.messageBuffer.array.slice(0, headerLength + bodyLength)
+    updateBodyLength.messageBuffer.array.slice(0, headerLength + bodyLength)
 
     this
   }
@@ -78,22 +61,11 @@ class Message() {
     commandCode = readCommandCode
     errorCode = readErrorCode
     bodyLength = readBodyLength
-    readPos = headerLength
-    writePos = headerLength
 
     this
   }
 
   // ======================================== Reading Data =============================================
-
-//  def readNextDatatype: this.type = {
-//
-//    currentDatatypeCount = 0
-//    currentDatatype = getByte
-//    currentDatatypeCountMax = getInt
-//
-//    this
-//  }
 
   def eom: Boolean = {
     if (messageBuffer.asInstanceOf[Buffer].position >= headerLength + bodyLength) return true
@@ -102,186 +74,12 @@ class Message() {
 
   def previewNextDatatype: Byte = messageBuffer.get(messageBuffer.asInstanceOf[Buffer].position)
 
-  def previewNextDatatypeCount: Int = ByteBuffer.wrap(messageBuffer.array.slice(readPos+1, readPos+5))
-                                                .order(ByteOrder.BIG_ENDIAN)
-                                                .getInt
-
-  def getCurrentDatatype(): Byte = currentDatatype
-
-  def getCurrentDatatypeLabel(): String = Datatype.withValue(currentDatatype).label
-
-  def getCurrentDatatypeCount(): Int = currentDatatypeCountMax
-
-  def readByte: Byte = {
-    try {
-      validateDatatype(previewNextDatatype, Datatype.Byte)
-      messageBuffer.get
-      messageBuffer.get
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        0.asInstanceOf[Byte]
-      }
-    }
-  }
-
-  def readChar: Char = {
-    try {
-      validateDatatype(previewNextDatatype, Datatype.Char)
-      messageBuffer.get
-      messageBuffer.get.asInstanceOf[Char]
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        0.asInstanceOf[Char]
-      }
-    }
-  }
-
-  def readShort: Short = {
-    try {
-      validateDatatype(previewNextDatatype, Datatype.Short)
-      messageBuffer.get
-      messageBuffer.getShort
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        0.asInstanceOf[Short]
-      }
-    }
-  }
-
-  def readInt: Int = {
-    try {
-      validateDatatype(previewNextDatatype, Datatype.Int)
-      messageBuffer.get
-      messageBuffer.getInt
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        0
-      }
-    }
-  }
-
-  def readLong: Long = {
-    try {
-      validateDatatype(previewNextDatatype, Datatype.Long)
-      messageBuffer.get
-      messageBuffer.getLong
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        0.asInstanceOf[Long]
-      }
-    }
-  }
-
-  def readFloat: Float = {
-    try {
-      validateDatatype(previewNextDatatype, Datatype.Float)
-      messageBuffer.get
-      messageBuffer.getFloat
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        0.0.asInstanceOf[Float]
-      }
-    }
-  }
-
-  def readDouble: Double = {
-    try {
-      validateDatatype(previewNextDatatype, Datatype.Double)
-      messageBuffer.get
-      messageBuffer.getDouble
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        0.0
-      }
-    }
-  }
-
-  def readString: String = {
-    try {
-      validateDatatype(previewNextDatatype, Datatype.String)
-      messageBuffer.get
-      getString
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        ""
-      }
-    }
-  }
-
-  def readParameter: Unit = {
-    try {
-      validateDatatype(previewNextDatatype, Datatype.Parameter)
-      messageBuffer.get
-    }
-    catch {
-      case e: InconsistentDatatypeException => println(e)
-    }
-  }
-
-  def readLibraryID: Byte = {
-    try {
-      validateDatatype(previewNextDatatype, Datatype.LibraryID)
-      messageBuffer.get
-      messageBuffer.get
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        0.asInstanceOf[Byte]
-      }
-    }
-  }
-
   def getArrayID: Short = {
     messageBuffer.get
   }
 
   def getWorkerID: Short = {
     messageBuffer.getShort
-  }
-
-  def readArrayID: Short = {
-    try {
-      validateDatatype(previewNextDatatype, Datatype.ArrayID)
-      messageBuffer.get
-      getArrayID
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        0.asInstanceOf[Short]
-      }
-    }
-  }
-
-  def readWorkerID: Short = {
-    try {
-      validateDatatype(previewNextDatatype, Datatype.WorkerID)
-      messageBuffer.get
-      getWorkerID
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        0.asInstanceOf[Short]
-      }
-    }
   }
 
   def getWorkerInfo: WorkerInfo = {
@@ -292,20 +90,6 @@ class Message() {
     val groupID: Short = messageBuffer.getShort
 
     new WorkerInfo(workerID, hostname, address, port, groupID)
-  }
-
-  def readWorkerInfo: WorkerInfo = {
-    try {
-      validateDatatype(messageBuffer.get, Datatype.WorkerInfo)
-      getWorkerInfo
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
-        new WorkerInfo
-      }
-    }
   }
 
   def getByteArray(length: Int): Array[Byte] = {
@@ -333,70 +117,248 @@ class Message() {
     new ArrayHandle(ID, name, numRows, numCols, sparse, numPartitions, workerLayout)
   }
 
+  @throws(classOf[InconsistentDatatypeException])
+  def readByte: Byte = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.Byte.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.Byte.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    messageBuffer.get
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
+  def readChar: Char = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.Char.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.Char.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    messageBuffer.get.asInstanceOf[Char]
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
+  def readShort: Short = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.Short.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.Short.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    messageBuffer.getShort
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
+  def readInt: Int = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.Int.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.Int.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    messageBuffer.getInt
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
+  def readLong: Long = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.Long.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.Long.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    messageBuffer.getLong
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
+  def readFloat: Float = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.Float.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.Float.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    messageBuffer.getFloat
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
+  def readDouble: Double = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.Double.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.Double.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    messageBuffer.getDouble
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
+  def readString: String = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.String.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.String.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    getString
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
+  def readParameter: Unit = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.Parameter.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.Parameter.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
+  def readLibraryID: Byte = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.LibraryID.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.LibraryID.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    messageBuffer.get
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
+  def readArrayID: Short = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.ArrayID.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.ArrayID.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    getArrayID
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
+  def readWorkerID: Short = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.WorkerID.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.WorkerID.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    getWorkerID
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
+  def readWorkerInfo: WorkerInfo = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.WorkerInfo.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.WorkerInfo.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    getWorkerInfo
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
   def readArrayInfo: ArrayHandle = {
-    try {
-      validateDatatype(messageBuffer.get, Datatype.ArrayInfo)
-      getArrayInfo
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.ArrayInfo.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.ArrayInfo.label}"
+      throw new InconsistentDatatypeException(message)
     }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
-        new ArrayHandle
-      }
-    }
+
+    getArrayInfo
   }
 
+  @throws(classOf[InconsistentDatatypeException])
   def readArrayBlockFloat: ArrayBlockFloat = {
-    try {
-      validateDatatype(messageBuffer.get, Datatype.ArrayBlockFloat)
-      val numDims: Int = messageBuffer.get.toInt
 
-      val nnz: Int = messageBuffer.getLong.toInt
-      val dims = Array.ofDim[Long](numDims, 3)
-      for (i <- 0 until numDims)
-        for (j <- 0 until 3)
-          dims(i)(j) = messageBuffer.getLong
+    val code = messageBuffer.get
 
-      val data = Array.fill[Float](nnz)(0.0.asInstanceOf[Float])
-      (0 until nnz).foreach(i => data(i) = messageBuffer.getFloat)
-
-      new ArrayBlockFloat(dims, data)
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
-        new ArrayBlockFloat
-      }
+    if (code != Datatype.ArrayBlockFloat.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.ArrayBlockFloat.label}"
+      throw new InconsistentDatatypeException(message)
     }
 
+    val numDims: Int = messageBuffer.get.toInt
+
+    val nnz: Int = messageBuffer.getLong.toInt
+    val dims = Array.ofDim[Long](numDims, 3)
+    for (i <- 0 until numDims)
+      for (j <- 0 until 3)
+        dims(i)(j) = messageBuffer.getLong
+
+    val data = Array.fill[Float](nnz)(0.0.asInstanceOf[Float])
+    (0 until nnz).foreach(i => data(i) = messageBuffer.getFloat)
+
+    new ArrayBlockFloat(dims, data)
   }
 
+  @throws(classOf[InconsistentDatatypeException])
   def readArrayBlockDouble: ArrayBlockDouble = {
-    try {
-      validateDatatype(messageBuffer.get, Datatype.ArrayBlockDouble)
-      val numDims: Int = messageBuffer.get.toInt
 
-      val nnz: Int = messageBuffer.getLong.toInt
-      val dims = Array.ofDim[Long](numDims, 3)
-      for (i <- 0 until numDims)
-        for (j <- 0 until 3)
-          dims(i)(j) = messageBuffer.getLong
+    val code = messageBuffer.get
 
-      val data = Array.fill[Double](nnz)(0.0)
-      (0 until nnz).foreach(i => data(i) = messageBuffer.getDouble)
-
-      new ArrayBlockDouble(dims, data)
-    }
-    catch {
-      case e: InconsistentDatatypeException => {
-        println(e)
-        messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
-        new ArrayBlockDouble
-      }
+    if (code != Datatype.ArrayBlockDouble.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.ArrayBlockDouble.label}"
+      throw new InconsistentDatatypeException(message)
     }
 
+    val numDims: Int = messageBuffer.get.toInt
+
+    val nnz: Int = messageBuffer.getLong.toInt
+    val dims = Array.ofDim[Long](numDims, 3)
+    for (i <- 0 until numDims)
+      for (j <- 0 until 3)
+        dims(i)(j) = messageBuffer.getLong
+
+    val data = Array.fill[Double](nnz)(0.0)
+    (0 until nnz).foreach(i => data(i) = messageBuffer.getDouble)
+
+    new ArrayBlockDouble(dims, data)
   }
 
   // ========================================= Writing Data =========================================
@@ -410,7 +372,6 @@ class Message() {
 
     this
   }
-
 
   def addHeader(header: Array[Byte]): this.type = {
 
@@ -528,42 +489,9 @@ class Message() {
 
   // ========================================================================================
 
-  @throws(classOf[InconsistentDatatypeException])
-  def validateDatatype(code: Byte, datatype: Datatype): Unit = {
-    if (code != datatype.value) {
-      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${datatype.label}"
-      throw new InconsistentDatatypeException(message)
-    }
-  }
-
-  def checkDatatype(datatype: Datatype): this.type = {
-
-    if (currentDatatype != datatype.value) {
-      currentDatatype = datatype.value
-
-      updateDatatypeCount
-      messageBuffer.put(currentDatatype)
-
-      currentDatatypeCount = 1
-      currentDatatypeCountPos = writePos
-      writePos += 4
-
-      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position+4)
-    }
-    else currentDatatypeCount += 1
-
-    this
-  }
-
   def updateBodyLength: this.type = {
     bodyLength = messageBuffer.asInstanceOf[Buffer].position - headerLength
     messageBuffer.putInt(6, bodyLength)
-
-    this
-  }
-
-  def updateDatatypeCount: this.type = {
-    messageBuffer.putInt(currentDatatypeCountPos, currentDatatypeCount)
 
     this
   }
@@ -594,7 +522,7 @@ class Message() {
     System.out.println(" ")
 
     while (!eom) {
-      currentDatatype = previewNextDatatype
+      val currentDatatype = previewNextDatatype
 
       var data: String = f"$space ${Datatype.withValue(currentDatatype).label}%-20s      "
 
@@ -609,7 +537,7 @@ class Message() {
         case Datatype.String.value => data = data.concat(s" $readString ")
         case Datatype.LibraryID.value => data = data.concat(s" $readLibraryID ")
         case Datatype.WorkerID.value => data = data.concat(s" $readWorkerID ")
-        case Datatype.WorkerInfo.value => data = data.concat(s" ${readWorkerInfo.toString}")
+        case Datatype.WorkerInfo.value => data = data.concat(s" ${readWorkerInfo.toString(true)}")
         case Datatype.ArrayID.value => data = data.concat(s" ${readArrayID} ")
         case Datatype.ArrayInfo.value => data = data.concat(s" ${readArrayInfo.toString}")
         case Datatype.ArrayBlockFloat.value => data = data.concat(s" ${readArrayBlockFloat.toString(space + "                            ")}")

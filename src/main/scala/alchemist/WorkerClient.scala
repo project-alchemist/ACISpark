@@ -155,15 +155,7 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
 
   def getRequestedArrayBlock(blockRange: Array[Long]): DenseVector = {
 
-    if (readMessage.readPos == readMessage.headerLength)
-      readMessage.readShort
-
-    val rowStart = readMessage.readLong
-    val rowEnd = readMessage.readLong
-    val colStart = readMessage.readLong
-    val colEnd = readMessage.readLong
-
-    val numCols = colEnd - colStart + 1
+    val b = readMessage.readArrayBlockDouble
 
     new DenseVector(Array[Double](1.0,2.0,3.0))
   }
@@ -173,6 +165,8 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
 
     this
   }
+
+  override def toString: String = f"Worker-$ID%03d running on $hostname at $address:$port"
 
 //  private def sendMessage(outbuf: ByteBuffer): Unit = {
 //    assert(!outbuf.hasRemaining())

@@ -114,7 +114,7 @@ object SVDTest {
 //    // Alchemist truncated SVD
 //    startTime = System.nanoTime()
 //    val (Uh, Sh, Vh): (MatrixHandle, MatrixHandle, MatrixHandle) = als.runTask(testLib, "truncatedSVD", Ah, k)
-//    println(s"Time cost of Alchemist truncates SVD: ${(System.nanoTime() - startTime) * 1.0E-9}")
+//    println(s"Time cost of Alchemist truncated SVD: ${(System.nanoTime() - startTime) * 1.0E-9}")
 //    println(" ")
 //
 //    // Alchemist matrix to local matrix

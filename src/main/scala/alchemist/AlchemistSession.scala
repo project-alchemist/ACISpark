@@ -30,7 +30,7 @@ object AlchemistSession {
   var connected: Boolean = false
 
   val driver: DriverClient = new DriverClient()
-  var workers: Map[Byte, WorkerClient] = Map.empty[Byte, WorkerClient]
+  var workers: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
 
   var spark: SparkSession = _
 
@@ -117,12 +117,16 @@ object AlchemistSession {
     this
   }
 
-  def requestWorkers(numWorkers: Byte): this.type = {
+  def requestWorkers(numWorkers: Short): this.type = {
 
     workers = driver.requestWorkers(numWorkers)
 
     if (workers.isEmpty)
       println(s"Alchemist could not assign $numWorkers workers")
+    else {
+      println(s"Assigned $numWorkers workers:")
+      workers.foreach(w => println(s"    ${w.toString}"))
+    }
 
     this
   }

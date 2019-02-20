@@ -218,7 +218,7 @@ class DriverClient {          // Connects to the Alchemist driver
     readMessage.readString
   }
 
-  def requestWorkers(numWorkers: Byte): Map[Byte, WorkerClient] = {
+  def requestWorkers(numWorkers: Short): Map[Short, WorkerClient] = {
 
     println(s"Requesting $numWorkers Alchemist workers")
 
@@ -227,23 +227,13 @@ class DriverClient {          // Connects to the Alchemist driver
 
     sendMessage
 
-    val numAssignedWorkers: Byte = readMessage.readByte
+    val numAssignedWorkers: Short = readMessage.readShort
 
+    var workers: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
 
-//    var workerClients: Array[WorkerClient] = Array.empty[WorkerClient]
-//
-//    if (numAssignedWorkers > 0) {
-//      workerClients =
-//    }
-//    else {
-//
-//    }
-
-    var workers: Map[Byte, WorkerClient] = Map.empty[Byte, WorkerClient]
-
-    (0 until numAssignedWorkers).foreach(_ => {
-      val ID: Byte = readMessage.readByte
-      workers += (ID -> new WorkerClient(ID, readMessage.readString, readMessage.readString, readMessage.readByte))
+    0 until numAssignedWorkers foreach(_ => {
+      val w: WorkerInfo = readMessage.readWorkerInfo
+      workers += (w.ID -> new WorkerClient(w.ID, w.hostname, w.address, w.port))
     })
 
     workers
@@ -295,33 +285,53 @@ class DriverClient {          // Connects to the Alchemist driver
   def listAllWorkers(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, Command.ListAllWorkers)
-                .writeString(preamble)
 
     sendMessage
+
+    val numWorkers = readMessage.readShort.toInt
+    println(s"Listing $numWorkers workers:")
+    0 until numWorkers foreach { _ => println(s"    ${readMessage.readWorkerInfo.toString(true)}") }
+
+    this
   }
 
   def listActiveWorkers(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, Command.ListActiveWorkers)
-                .writeString(preamble)
 
     sendMessage
+
+    val numWorkers = readMessage.readShort.toInt
+    println(s"Listing $numWorkers workers:")
+    0 until numWorkers foreach { _ => println(s"    ${readMessage.readWorkerInfo.toString(true)}") }
+
+    this
   }
 
   def listInactiveWorkers(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, Command.ListInactiveWorkers)
-                .writeString(preamble)
 
     sendMessage
+
+    val numWorkers = readMessage.readShort.toInt
+    println(s"Listing $numWorkers workers:")
+    0 until numWorkers foreach { _ => println(s"    ${readMessage.readWorkerInfo.toString(false)}") }
+
+    this
   }
 
   def listAssignedWorkers(preamble: String): this.type = {
 
     writeMessage.start(clientID, sessionID, Command.ListAssignedWorkers)
-                .writeString(preamble)
 
     sendMessage
+
+    val numWorkers = readMessage.readShort.toInt
+    println(s"Listing $numWorkers workers:")
+    0 until numWorkers foreach { _ => println(s"    ${readMessage.readWorkerInfo.toString(false)}") }
+
+    this
   }
 
   def loadLibrary(name: String, path: String): this.type = {
