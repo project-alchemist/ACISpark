@@ -1,7 +1,6 @@
 package alchemist
 
 import scala.io.Source
-import alchemist.io._
 import org.apache.spark.mllib.linalg.distributed.IndexedRow
 
 import scala.collection.mutable.ArrayBuffer
@@ -24,6 +23,9 @@ import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix, 
 import scala.math.max
 
 
+case class ArrayID(value: Short)
+
+
 object AlchemistSession {
   println("Starting Alchemist session")
 
@@ -31,6 +33,7 @@ object AlchemistSession {
 
   val driver: DriverClient = new DriverClient()
   var workers: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
+  var libraries: Map[Byte, LibraryHandle] = Map.empty[Byte, LibraryHandle]
 
   var spark: SparkSession = _
 
@@ -57,13 +60,6 @@ object AlchemistSession {
     this
   }
 
-
-//  val classToLoad: Class[_] = Class.forName("com.MyClass", true, child)
-//  val method: Method = classToLoad.getDeclaredMethod("myMethod")
-//  val instance: Any = classToLoad.newInstance
-//  val result: Any = method.invoke(instance)
-
-
   def createRandomRDD(nRows: Int, nCols: Int, ss: SparkSession): RDD[Array[Array[Double]]] = {
     val randomArray = Array.ofDim[Double](nRows,nCols)
 
@@ -77,17 +73,27 @@ object AlchemistSession {
     ss.sparkContext.parallelize(Seq(randomArray))
   }
 
-  def loadLibrary(name: String, path: String, jar: String): this.type = {
-    println(s"Loading library $name")
-    driver.loadLibrary(name, path)
+  def loadLibrary(name: String, path: String, jar: String): LibraryHandle = {
 
-    var classLoader = new java.net.URLClassLoader(
-      Array(new File(jar).toURI.toURL),
-      this.getClass.getClassLoader)
+    println(s"Loading library $name at $path")
+    try {
+      val lh = driver.loadLibrary(name, path)
+      libraries = libraries + (lh.id -> lh)
 
-    var c = classLoader.loadClass(s"${name.toLowerCase}.${name}")
+      println(s"Loaded library $name with ID ${lh.id}")
 
-    this
+      return lh
+    }
+    catch {
+      case e: LibraryNotFoundException => { println(e.getMessage)
+        return LibraryHandle(0, "", "") }
+    }
+
+//    var classLoader = new java.net.URLClassLoader(
+//      Array(new File(jar).toURI.toURL),
+//      this.getClass.getClassLoader)
+//
+//    var c = classLoader.loadClass(s"${name.toLowerCase}.${name}")
   }
 
   def connect(_address: String = "", _port: Int = 0): this.type = {
@@ -107,25 +113,38 @@ object AlchemistSession {
         in.close() //Close the input stream
       }
       catch {
-        case e: Exception => println("Got this unknown exception: " + e)
+        case e: Exception => println("Got this unknown exception: " + e.getMessage)
       }
     }
 
     println(s"Connecting to Alchemist at $address:$port")
-    driver.connect(address, port)
+    try {
+      connected = driver.connect(address, port)
+    }
+    catch {
+      case e: InvalidHandshakeException => println(e.getMessage)
+    }
 
     this
   }
 
   def requestWorkers(numWorkers: Short): this.type = {
 
-    workers = driver.requestWorkers(numWorkers)
+    if (connected) {
+      if (numWorkers < 1)
+        println(s"Cannot request $numWorkers Alchemist workers")
+      else {
+        println(s"Requesting $numWorkers Alchemist workers")
 
-    if (workers.isEmpty)
-      println(s"Alchemist could not assign $numWorkers workers")
-    else {
-      println(s"Assigned $numWorkers workers:")
-      workers.foreach(w => println(s"    ${w.toString}"))
+        workers = driver.requestWorkers(numWorkers)
+
+        if (workers.isEmpty)
+          println(s"Alchemist could not assign $numWorkers workers")
+        else {
+          println(s"Assigned $numWorkers workers:")
+          workers.foreach(w => println(s"    ${w.toString}"))
+        }
+      }
     }
 
     this
@@ -133,21 +152,17 @@ object AlchemistSession {
 
   def yieldWorkers(): this.type = {
 
-    driver.yieldWorkers()
+    if (connected) {
+      driver.yieldWorkers()
+    }
 
     this
   }
 
-  def runTask(libName: String, name: String, mh: ArrayHandle, rank: Int): this.type = {
+  def runTask(libID: Byte, name: String, inArgs: Parameters): Parameters = {
 
-    println(s"Alchemist started task $name - please wait ...")
-//    start = time.time()
-//    val (alU, alS, alV) = driver.truncatedSVD(libName, name, mh, rank)
-//    end = time.time()
-//    println(s"Elapsed time for truncated SVD is ${end - start}")
-//    (alU, alS, alV)
-
-    this
+    print(s"Alchemist started task '$name' ... ")
+    driver.runTask(libID, name, inArgs)
   }
 
   def getArrayHandle(mat: IndexedRowMatrix): ArrayHandle = driver.sendArrayInfo(mat.numRows, mat.numCols)
@@ -235,7 +250,6 @@ object AlchemistSession {
 
   def getArrayHandle(mat: RowMatrix): ArrayHandle = driver.sendArrayInfo(mat.numRows, mat.numCols)
 
-
   def sendTestString: this.type = {
     println("Sending test string to Alchemist")
     driver.sendTestString("This is a test string from ACISpark")
@@ -269,37 +283,30 @@ object AlchemistSession {
     this
   }
 
-  def listAlchemistWorkers(preamble: String = ""): this.type = {
-    driver.listAllWorkers(preamble)
+  def listAlchemistWorkers: this.type = printWorkers(driver.listAllWorkers)
+
+  def listAllWorkers: this.type = printWorkers(driver.listAllWorkers)
+
+  def listInactiveWorkers: this.type = printWorkers(driver.listInactiveWorkers, "inactive ")
+
+  def listActiveWorkers: this.type = printWorkers(driver.listActiveWorkers, "active ")
+
+  def listAssignedWorkers: this.type = printWorkers(driver.listAssignedWorkers, "assigned ")
+
+  def printWorkers(workerList: Array[WorkerInfo], workerType: String = ""): this.type = {
+
+    workerList.length match {
+      case 0 => println(s"No ${workerType}workers")
+      case 1 => println(s"Listing 1 ${workerType}worker")
+      case _ => println(s"Listing ${workerList.length} ${workerType}workers")
+    }
+
+    workerList foreach { w => println(s"    ${w.toString(true)}") }
 
     this
   }
 
-  def listAllWorkers(preamble: String = ""): this.type = {
-    driver.listAllWorkers(preamble)
-
-    this
-  }
-
-  def listInactiveWorkers(preamble: String = ""): this.type = {
-    driver.listInactiveWorkers(preamble)
-
-    this
-  }
-
-  def listActiveWorkers(preamble: String = ""): this.type = {
-    driver.listActiveWorkers(preamble)
-
-    this
-  }
-
-  def listAssignedWorkers(preamble: String = ""): this.type = {
-    driver.listAssignedWorkers(preamble)
-
-    this
-  }
-
-  def stop(): this.type = {
+  def stop: this.type = {
 
     yieldWorkers
     println("Ending Alchemist session")

@@ -2,11 +2,11 @@ package alchemist
 
 import scala.collection.JavaConverters._
 import scala.collection.Map
+import scala.reflect.{ClassTag, classTag}
 import scala.util.Random
-
 import java.net.Socket
 import java.nio.{ByteBuffer, ByteOrder}
-import java.util.{Collections, Arrays}
+import java.util.{Arrays, Collections}
 import java.io.{BufferedReader, FileInputStream, InputStream, InputStreamReader, OutputStream, PrintWriter, DataInputStream => JDataInputStream, DataOutputStream => JDataOutputStream}
 
 import scala.io.Source
@@ -109,33 +109,56 @@ class DriverClient {          // Connects to the Alchemist driver
     this
   }
 
+  def runTask(libID: Byte, methodName: String, inArgs: Parameters): Parameters = {
 
-//  def handleMessage: this.type = {
+    writeMessage.start(clientID, sessionID, Command.RunTask)
+    writeMessage.writeLibraryID(libID)
+    writeMessage.writeString(methodName)
+    inArgs.getParameters.foreach { case (name, value) => serializeParameter(name, value) }
+
+    sendMessage
+
+    deserializeParameters
+  }
+
+  def deserializeParameters: Parameters = {
+    val outArgs: Parameters = new Parameters
+    outArgs.add[Int]("rank", 32)
+
+    outArgs
+  }
+
+  def serializeParameter(name: String, p: ParameterValue): Unit = {
+
+    writeMessage.writeParameter.writeString(name)
+    p match {
+      case Parameter(v: Byte) => writeMessage.writeByte(p.asInstanceOf[Parameter[Byte]].value)
+      case Parameter(v: Short) => writeMessage.writeShort(p.asInstanceOf[Parameter[Short]].value)
+      case Parameter(v: Int) => writeMessage.writeInt(p.asInstanceOf[Parameter[Int]].value)
+      case Parameter(v: Long) => writeMessage.writeLong(p.asInstanceOf[Parameter[Long]].value)
+      case Parameter(v: Float) => writeMessage.writeFloat(p.asInstanceOf[Parameter[Float]].value)
+      case Parameter(v: Double) => writeMessage.writeDouble(p.asInstanceOf[Parameter[Double]].value)
+      case Parameter(v: Char) => writeMessage.writeChar(p.asInstanceOf[Parameter[Char]].value)
+      case Parameter(v: String) => writeMessage.writeString(p.asInstanceOf[Parameter[String]].value)
+      case Parameter(v: ArrayID) => writeMessage.writeArrayID(p.asInstanceOf[Parameter[ArrayID]].value)
+      case _ => println("Unknown type")
+    }
+  }
+
+//  def deserializeParameter: Parameter = {
 //
-//    val cc = readMessage.readCommandCode
-//
-//    cc match {
-//      case  0 => wait
-//      case  2 => requestID
-//      case  3 => clientInfo
-//      case  4 => sendTestString
-//      case  5 => requestTestString
-//      case  6 => requestWorkers
-//      case  7 => yieldWorkers
-//      case  8 => sendAssignedWorkersInfo
-//      case  9 => listAllWorkers
-//      case 10 => listActiveWorkers
-//      case 11 => listInactiveWorkers
-//      case 12 => listAssignedWorkers
-//      case 13 => loadLibrary
-//      case 14 => runTask
-//      case 15 => unloadLibrary
-//      case 16 => matrixInfo
-//      case 17 => matrixLayout
-//      case 18 => matrixBlock
+//    writeMessage.writeParameter.writeString(p.name)
+//    p.datatype.value match {
+//      case Datatype.Byte.value => writeMessage.writeByte(p.value)
+//      case Datatype.Short.value => writeMessage.writeShort(p.value)
+//      case Datatype.Int.value => writeMessage.writeInt(p.value)
+//      case Datatype.Long.value => writeMessage.writeLong(p.value)
+//      case Datatype.Float.value => writeMessage.writeFloat(p.value)
+//      case Datatype.Double.value => writeMessage.writeDouble(p.value)
+//      case Datatype.Char.value => writeMessage.writeChar(p.value)
+//      case Datatype.String.value => writeMessage.writeString(p.value)
+//      case Datatype.ArrayID.value => writeMessage.writeArrayID(p.value)
 //    }
-//
-//    this
 //  }
 
   def handshake: Boolean = {
@@ -155,31 +178,29 @@ class DriverClient {          // Connects to the Alchemist driver
 
     sendMessage
 
-    var handshakeSuccess: Boolean = false
-
-    if (readMessage.readCommandCode == 1) {
-      if (readMessage.readShort == 4321) {
-        if (readMessage.readString == "DCBA") {
-          if (readMessage.readDouble ==  3.33) {
-            clientID = readMessage.readClientID
-            sessionID = readMessage.readSessionID
-          }
-        }
-      }
-    }
-
-    handshakeSuccess
+    validateHandshake
   }
 
-  def requestID: this.type = {
+  def validateHandshake: Boolean = {
+
+    if (readMessage.readCommandCode == 1 && readMessage.readShort == 4321 &&
+        readMessage.readString == "DCBA" && readMessage.readDouble ==  3.33) {
+      clientID = readMessage.readClientID
+      sessionID = readMessage.readSessionID
+
+      return true
+    }
+
+    false
+  }
+
+  def requestClientID: this.type = {
 
     writeMessage.start(clientID, sessionID, Command.RequestId)
 
     sendMessage
 
-    if (readMessage.readCommandCode == 2) {
-      ID = readMessage.readShort
-    }
+    ID = readMessage.readClientID
 
     this
   }
@@ -191,10 +212,6 @@ class DriverClient {          // Connects to the Alchemist driver
                 .writeString(logDir)
 
     sendMessage
-
-    if (readMessage.readCommandCode == 3) {
-//      ID = readMessage.readShort
-    }
 
     this
   }
@@ -220,7 +237,6 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def requestWorkers(numWorkers: Short): Map[Short, WorkerClient] = {
 
-    println(s"Requesting $numWorkers Alchemist workers")
 
     writeMessage.start(clientID, sessionID, Command.RequestWorkers)
                 .writeShort(numWorkers)
@@ -282,65 +298,61 @@ class DriverClient {          // Connects to the Alchemist driver
     sendMessage
   }
 
-  def listAllWorkers(preamble: String): this.type = {
+  def readWorkerList: Array[WorkerInfo] = {
+
+    var workerList: Array[WorkerInfo] = Array.empty[WorkerInfo]
+
+    val numWorkers = readMessage.readShort.toInt
+    0 until numWorkers foreach { _ => workerList = workerList :+ readMessage.readWorkerInfo }
+
+    workerList
+  }
+
+  def listAllWorkers: Array[WorkerInfo] = {
 
     writeMessage.start(clientID, sessionID, Command.ListAllWorkers)
 
     sendMessage
 
-    val numWorkers = readMessage.readShort.toInt
-    println(s"Listing $numWorkers workers:")
-    0 until numWorkers foreach { _ => println(s"    ${readMessage.readWorkerInfo.toString(true)}") }
-
-    this
+    readWorkerList
   }
 
-  def listActiveWorkers(preamble: String): this.type = {
+  def listActiveWorkers: Array[WorkerInfo] = {
 
     writeMessage.start(clientID, sessionID, Command.ListActiveWorkers)
 
     sendMessage
 
-    val numWorkers = readMessage.readShort.toInt
-    println(s"Listing $numWorkers workers:")
-    0 until numWorkers foreach { _ => println(s"    ${readMessage.readWorkerInfo.toString(true)}") }
-
-    this
+    readWorkerList
   }
 
-  def listInactiveWorkers(preamble: String): this.type = {
+  def listInactiveWorkers: Array[WorkerInfo] = {
 
     writeMessage.start(clientID, sessionID, Command.ListInactiveWorkers)
 
     sendMessage
 
-    val numWorkers = readMessage.readShort.toInt
-    println(s"Listing $numWorkers workers:")
-    0 until numWorkers foreach { _ => println(s"    ${readMessage.readWorkerInfo.toString(false)}") }
-
-    this
+    readWorkerList
   }
 
-  def listAssignedWorkers(preamble: String): this.type = {
+  def listAssignedWorkers: Array[WorkerInfo] = {
 
     writeMessage.start(clientID, sessionID, Command.ListAssignedWorkers)
 
     sendMessage
 
-    val numWorkers = readMessage.readShort.toInt
-    println(s"Listing $numWorkers workers:")
-    0 until numWorkers foreach { _ => println(s"    ${readMessage.readWorkerInfo.toString(false)}") }
-
-    this
+    readWorkerList
   }
 
-  def loadLibrary(name: String, path: String): this.type = {
+  def loadLibrary(name: String, path: String): LibraryHandle = {
 
     writeMessage.start(clientID, sessionID, Command.LoadLibrary)
                 .writeString(name)
                 .writeString(path)
 
     sendMessage
+
+    LibraryHandle(readMessage.readLibraryID, name, path)
   }
 
   def runTask(preamble: String): this.type = {

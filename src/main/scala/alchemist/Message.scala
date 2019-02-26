@@ -454,9 +454,9 @@ class Message() {
     this
   }
 
-  def writeArrayID(value: Short): this.type = {
+  def writeArrayID(value: ArrayID): this.type = {
     messageBuffer.put(Datatype.ArrayID.value)
-                 .putShort(value)
+                 .putShort(value.value)
 
     this
   }
@@ -481,7 +481,7 @@ class Message() {
     this
   }
 
-  def writeParameter(): this.type = {
+  def writeParameter: this.type = {
     messageBuffer.put(Datatype.Parameter.value)
 
     this
@@ -524,24 +524,59 @@ class Message() {
     while (!eom) {
       val currentDatatype = previewNextDatatype
 
-      var data: String = f"$space ${Datatype.withValue(currentDatatype).label}%-20s      "
+      var data: String = s"$space "
 
-      currentDatatype match {
-        case Datatype.Byte.value => data = data.concat(s" $readByte ")
-        case Datatype.Char.value => data = data.concat(s" $readChar ")
-        case Datatype.Short.value => data = data.concat(s" $readShort ")
-        case Datatype.Int.value => data = data.concat(s" $readInt ")
-        case Datatype.Long.value => data = data.concat(s" $readLong ")
-        case Datatype.Float.value => data = data.concat(s" $readFloat ")
-        case Datatype.Double.value => data = data.concat(s" $readDouble ")
-        case Datatype.String.value => data = data.concat(s" $readString ")
-        case Datatype.LibraryID.value => data = data.concat(s" $readLibraryID ")
-        case Datatype.WorkerID.value => data = data.concat(s" $readWorkerID ")
-        case Datatype.WorkerInfo.value => data = data.concat(s" ${readWorkerInfo.toString(true)}")
-        case Datatype.ArrayID.value => data = data.concat(s" ${readArrayID} ")
-        case Datatype.ArrayInfo.value => data = data.concat(s" ${readArrayInfo.toString}")
-        case Datatype.ArrayBlockFloat.value => data = data.concat(s" ${readArrayBlockFloat.toString(space + "                            ")}")
-        case Datatype.ArrayBlockDouble.value => data = data.concat(s" ${readArrayBlockDouble.toString(space + "                            ")}")
+      if (currentDatatype == Datatype.Parameter.value) {
+        readParameter
+        data = data.concat(f"${Datatype.Parameter.label}%-20s        $readString\n")
+
+        val parameterDatatype = previewNextDatatype
+
+        data = data.concat(f"$space     ${Datatype.withValue(parameterDatatype).label}%-16s      ")
+
+        parameterDatatype match {
+          case Datatype.Byte.value => data = data.concat(s" $readByte ")
+          case Datatype.Char.value => data = data.concat(s" $readChar ")
+          case Datatype.Short.value => data = data.concat(s" $readShort ")
+          case Datatype.Int.value => data = data.concat(s" $readInt ")
+          case Datatype.Long.value => data = data.concat(s" $readLong ")
+          case Datatype.Float.value => data = data.concat(s" $readFloat ")
+          case Datatype.Double.value => data = data.concat(s" $readDouble ")
+          case Datatype.String.value => data = data.concat(s" $readString ")
+          case Datatype.LibraryID.value => data = data.concat(s" $readLibraryID ")
+          case Datatype.WorkerID.value => data = data.concat(s" $readWorkerID ")
+          case Datatype.WorkerInfo.value => data = data.concat(s" ${readWorkerInfo.toString(true)}")
+          case Datatype.ArrayID.value => data = data.concat(s" ${readArrayID} ")
+          case Datatype.ArrayInfo.value => data = data.concat(s" ${readArrayInfo.toString}")
+          case Datatype.ArrayBlockFloat.value => data = data.concat(s" ${readArrayBlockFloat.toString(space + "                            ")}")
+          case Datatype.ArrayBlockDouble.value => data = data.concat(s" ${readArrayBlockDouble.toString(space + "                            ")}")
+          case Datatype.Parameter.value => data = data.concat(s" ${readParameter}")
+          case _ => println("Unknown type")
+        }
+      }
+      else {
+
+        data = data.concat(f"${Datatype.withValue(currentDatatype).label}%-20s      ")
+
+        currentDatatype match {
+          case Datatype.Byte.value => data = data.concat(s" $readByte ")
+          case Datatype.Char.value => data = data.concat(s" $readChar ")
+          case Datatype.Short.value => data = data.concat(s" $readShort ")
+          case Datatype.Int.value => data = data.concat(s" $readInt ")
+          case Datatype.Long.value => data = data.concat(s" $readLong ")
+          case Datatype.Float.value => data = data.concat(s" $readFloat ")
+          case Datatype.Double.value => data = data.concat(s" $readDouble ")
+          case Datatype.String.value => data = data.concat(s" $readString ")
+          case Datatype.LibraryID.value => data = data.concat(s" $readLibraryID ")
+          case Datatype.WorkerID.value => data = data.concat(s" $readWorkerID ")
+          case Datatype.WorkerInfo.value => data = data.concat(s" ${readWorkerInfo.toString(true)}")
+          case Datatype.ArrayID.value => data = data.concat(s" ${readArrayID} ")
+          case Datatype.ArrayInfo.value => data = data.concat(s" ${readArrayInfo.toString}")
+          case Datatype.ArrayBlockFloat.value => data = data.concat(s" ${readArrayBlockFloat.toString(space + "                            ")}")
+          case Datatype.ArrayBlockDouble.value => data = data.concat(s" ${readArrayBlockDouble.toString(space + "                            ")}")
+          case Datatype.Parameter.value => data = data.concat(s" ${readParameter}")
+          case _ => println("Unknown type")
+        }
       }
 
       System.out.println(s"$data")
