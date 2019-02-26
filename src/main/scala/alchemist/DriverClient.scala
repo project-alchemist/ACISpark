@@ -109,10 +109,10 @@ class DriverClient {          // Connects to the Alchemist driver
     this
   }
 
-  def runTask(libID: Byte, methodName: String, inArgs: Parameters): Parameters = {
+  def runTask(lib: LibraryHandle, methodName: String, inArgs: Parameters): Parameters = {
 
     writeMessage.start(clientID, sessionID, Command.RunTask)
-    writeMessage.writeLibraryID(libID)
+    writeMessage.writeLibraryID(lib.id)
     writeMessage.writeString(methodName)
     inArgs.getParameters.foreach { case (name, value) => serializeParameter(name, value) }
 
@@ -123,6 +123,23 @@ class DriverClient {          // Connects to the Alchemist driver
 
   def deserializeParameters: Parameters = {
     val outArgs: Parameters = new Parameters
+    while (!readMessage.eom) {
+      var p = readMessage.readParameter
+
+      p match {
+        case Parameter(n: String, v: Byte) => outArgs.add(p.asInstanceOf[Parameter[Byte]])
+        case Parameter(n: String, v: Short) => outArgs.add(p.asInstanceOf[Parameter[Short]])
+        case Parameter(n: String, v: Int) => outArgs.add(p.asInstanceOf[Parameter[Int]])
+        case Parameter(n: String, v: Long) => outArgs.add(p.asInstanceOf[Parameter[Long]])
+        case Parameter(n: String, v: Float) => outArgs.add(p.asInstanceOf[Parameter[Float]])
+        case Parameter(n: String, v: Double) => outArgs.add(p.asInstanceOf[Parameter[Double]])
+        case Parameter(n: String, v: Char) => outArgs.add(p.asInstanceOf[Parameter[Char]])
+        case Parameter(n: String, v: String) => outArgs.add(p.asInstanceOf[Parameter[String]])
+        case Parameter(n: String, v: ArrayID) => outArgs.add(p.asInstanceOf[Parameter[ArrayID]])
+        case _ => "UNKNOWN TYPE"
+      }
+    }
+
     outArgs.add[Int]("rank", 32)
 
     outArgs
@@ -132,15 +149,15 @@ class DriverClient {          // Connects to the Alchemist driver
 
     writeMessage.writeParameter.writeString(name)
     p match {
-      case Parameter(v: Byte) => writeMessage.writeByte(p.asInstanceOf[Parameter[Byte]].value)
-      case Parameter(v: Short) => writeMessage.writeShort(p.asInstanceOf[Parameter[Short]].value)
-      case Parameter(v: Int) => writeMessage.writeInt(p.asInstanceOf[Parameter[Int]].value)
-      case Parameter(v: Long) => writeMessage.writeLong(p.asInstanceOf[Parameter[Long]].value)
-      case Parameter(v: Float) => writeMessage.writeFloat(p.asInstanceOf[Parameter[Float]].value)
-      case Parameter(v: Double) => writeMessage.writeDouble(p.asInstanceOf[Parameter[Double]].value)
-      case Parameter(v: Char) => writeMessage.writeChar(p.asInstanceOf[Parameter[Char]].value)
-      case Parameter(v: String) => writeMessage.writeString(p.asInstanceOf[Parameter[String]].value)
-      case Parameter(v: ArrayID) => writeMessage.writeArrayID(p.asInstanceOf[Parameter[ArrayID]].value)
+      case Parameter(n: String, v: Byte) => writeMessage.writeByte(p.asInstanceOf[Parameter[Byte]].value)
+      case Parameter(n: String, v: Short) => writeMessage.writeShort(p.asInstanceOf[Parameter[Short]].value)
+      case Parameter(n: String, v: Int) => writeMessage.writeInt(p.asInstanceOf[Parameter[Int]].value)
+      case Parameter(n: String, v: Long) => writeMessage.writeLong(p.asInstanceOf[Parameter[Long]].value)
+      case Parameter(n: String, v: Float) => writeMessage.writeFloat(p.asInstanceOf[Parameter[Float]].value)
+      case Parameter(n: String, v: Double) => writeMessage.writeDouble(p.asInstanceOf[Parameter[Double]].value)
+      case Parameter(n: String, v: Char) => writeMessage.writeChar(p.asInstanceOf[Parameter[Char]].value)
+      case Parameter(n: String, v: String) => writeMessage.writeString(p.asInstanceOf[Parameter[String]].value)
+      case Parameter(n: String, v: ArrayID) => writeMessage.writeArrayID(p.asInstanceOf[Parameter[ArrayID]].value)
       case _ => println("Unknown type")
     }
   }
@@ -278,10 +295,10 @@ class DriverClient {          // Connects to the Alchemist driver
 
     sendMessage
 
-    val matrixID: Short = readMessage.readShort
+    val arrayID: ArrayID = readMessage.readArrayID
     val rowLayout: Array[Short] = extractLayout
 
-    new ArrayHandle(matrixID)
+    new ArrayHandle(arrayID)
   }
 
   def extractLayout: Array[Short] = {

@@ -159,10 +159,10 @@ object AlchemistSession {
     this
   }
 
-  def runTask(libID: Byte, name: String, inArgs: Parameters): Parameters = {
+  def runTask(lib: LibraryHandle, name: String, inArgs: Parameters): Parameters = {
 
     print(s"Alchemist started task '$name' ... ")
-    driver.runTask(libID, name, inArgs)
+    driver.runTask(lib, name, inArgs)
   }
 
   def getArrayHandle(mat: IndexedRowMatrix): ArrayHandle = driver.sendArrayInfo(mat.numRows, mat.numCols)
@@ -184,7 +184,7 @@ object AlchemistSession {
       })
 
       if (connected == workers.size) {
-        workers.foreach(w => w._2.startSendArrayBlocks(mh.id))
+        workers.foreach(w => w._2.startSendArrayBlocks(mh.id.value))
 
         rows.foreach(row => {
           lazy val elements = row.vector.toArray
@@ -223,7 +223,7 @@ object AlchemistSession {
       var currentRowIter: Iterator[IndexedRow] = rows.map(row => new IndexedRow(row.index, row.vector)).iterator
 
       if (connected == workers.size) {
-        workers.foreach(w => w._2.startRequestArrayBlocks(mh.id))
+        workers.foreach(w => w._2.startRequestArrayBlocks(mh.id.value))
 
         rows.foreach(row => {
           val index: Long = row.index

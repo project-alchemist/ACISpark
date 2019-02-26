@@ -74,8 +74,8 @@ class Message() {
 
   def previewNextDatatype: Byte = messageBuffer.get(messageBuffer.asInstanceOf[Buffer].position)
 
-  def getArrayID: Short = {
-    messageBuffer.get
+  def getArrayID: ArrayID = {
+    ArrayID(messageBuffer.get)
   }
 
   def getWorkerID: Short = {
@@ -104,7 +104,7 @@ class Message() {
   }
 
   def getArrayInfo: ArrayHandle = {
-    val ID: Short = getArrayID
+    val ID: ArrayID = getArrayID
     val nameLength: Int = messageBuffer.getInt
     val name: String = getString
     val numRows: Long = messageBuffer.getLong
@@ -230,7 +230,7 @@ class Message() {
   }
 
   @throws(classOf[InconsistentDatatypeException])
-  def readParameter: Unit = {
+  def readParameter: ParameterValue = {
 
     val code = messageBuffer.get
 
@@ -238,6 +238,25 @@ class Message() {
       messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
       val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.Parameter.label}"
       throw new InconsistentDatatypeException(message)
+    }
+
+    val name: String = readString
+    val parameterDatatype = previewNextDatatype
+
+    parameterDatatype match {
+      case Datatype.Byte.value => Parameter[Byte](name, readByte)
+      case Datatype.Char.value => Parameter[Char](name, readChar)
+      case Datatype.Short.value => Parameter[Short](name, readShort)
+      case Datatype.Int.value => Parameter[Int](name, readInt)
+      case Datatype.Long.value => Parameter[Long](name, readLong)
+      case Datatype.Float.value => Parameter[Float](name, readFloat)
+      case Datatype.Double.value => Parameter[Double](name, readDouble)
+      case Datatype.String.value => Parameter[String](name, readString)
+      case Datatype.ArrayID.value => Parameter[ArrayID](name, readArrayID)
+      case _ => {
+        val message: String = s"Parameters cannot have datatype ${Datatype.withValue(parameterDatatype).label}"
+        throw new InconsistentDatatypeException(message)
+      }
     }
   }
 
@@ -256,7 +275,7 @@ class Message() {
   }
 
   @throws(classOf[InconsistentDatatypeException])
-  def readArrayID: Short = {
+  def readArrayID: ArrayID = {
 
     val code = messageBuffer.get
 
@@ -513,11 +532,11 @@ class Message() {
 
     System.out.println()
     System.out.println(s"$space ==================================================================")
-    System.out.println(s"$space Client ID:                 $clientID")
-    System.out.println(s"$space Session ID:                $sessionID")
-    System.out.println(s"$space Command code:              $commandCode (${Command.withValue(commandCode).label})")
-    System.out.println(s"$space Error code:                $errorCode (${Error.withValue(errorCode).label})")
-    System.out.println(s"$space Message body length:       $bodyLength")
+    System.out.println(s"$space Client ID:                      $clientID")
+    System.out.println(s"$space Session ID:                     $sessionID")
+    System.out.println(s"$space Command code:                   $commandCode (${Command.withValue(commandCode).label})")
+    System.out.println(s"$space Error code:                     $errorCode (${Error.withValue(errorCode).label})")
+    System.out.println(s"$space Message body length:            $bodyLength")
     System.out.println(s"$space ------------------------------------------------------------------")
     System.out.println(" ")
 
@@ -527,36 +546,25 @@ class Message() {
       var data: String = s"$space "
 
       if (currentDatatype == Datatype.Parameter.value) {
-        readParameter
-        data = data.concat(f"${Datatype.Parameter.label}%-20s        $readString\n")
+        val p = readParameter
 
-        val parameterDatatype = previewNextDatatype
-
-        data = data.concat(f"$space     ${Datatype.withValue(parameterDatatype).label}%-16s      ")
-
-        parameterDatatype match {
-          case Datatype.Byte.value => data = data.concat(s" $readByte ")
-          case Datatype.Char.value => data = data.concat(s" $readChar ")
-          case Datatype.Short.value => data = data.concat(s" $readShort ")
-          case Datatype.Int.value => data = data.concat(s" $readInt ")
-          case Datatype.Long.value => data = data.concat(s" $readLong ")
-          case Datatype.Float.value => data = data.concat(s" $readFloat ")
-          case Datatype.Double.value => data = data.concat(s" $readDouble ")
-          case Datatype.String.value => data = data.concat(s" $readString ")
-          case Datatype.LibraryID.value => data = data.concat(s" $readLibraryID ")
-          case Datatype.WorkerID.value => data = data.concat(s" $readWorkerID ")
-          case Datatype.WorkerInfo.value => data = data.concat(s" ${readWorkerInfo.toString(true)}")
-          case Datatype.ArrayID.value => data = data.concat(s" ${readArrayID} ")
-          case Datatype.ArrayInfo.value => data = data.concat(s" ${readArrayInfo.toString}")
-          case Datatype.ArrayBlockFloat.value => data = data.concat(s" ${readArrayBlockFloat.toString(space + "                            ")}")
-          case Datatype.ArrayBlockDouble.value => data = data.concat(s" ${readArrayBlockDouble.toString(space + "                            ")}")
-          case Datatype.Parameter.value => data = data.concat(s" ${readParameter}")
-          case _ => println("Unknown type")
-        }
+        data = data.concat("PARAMETER ")
+        data = data.concat(p match {
+          case Parameter(n: String, v: Byte) => p.asInstanceOf[Parameter[Byte]].toString(true)
+          case Parameter(n: String, v: Short) => p.asInstanceOf[Parameter[Short]].toString(true)
+          case Parameter(n: String, v: Int) => p.asInstanceOf[Parameter[Int]].toString(true)
+          case Parameter(n: String, v: Long) => p.asInstanceOf[Parameter[Long]].toString(true)
+          case Parameter(n: String, v: Float) => p.asInstanceOf[Parameter[Float]].toString(true)
+          case Parameter(n: String, v: Double) => p.asInstanceOf[Parameter[Double]].toString(true)
+          case Parameter(n: String, v: Char) => p.asInstanceOf[Parameter[Char]].toString(true)
+          case Parameter(n: String, v: String) => p.asInstanceOf[Parameter[String]].toString(true)
+          case Parameter(n: String, v: ArrayID) => p.asInstanceOf[Parameter[ArrayID]].toString(true)
+          case _ => "UNKNOWN TYPE"
+        })
       }
       else {
 
-        data = data.concat(f"${Datatype.withValue(currentDatatype).label}%-20s      ")
+        data = data.concat(f"${Datatype.withValue(currentDatatype).label}%-25s      ")
 
         currentDatatype match {
           case Datatype.Byte.value => data = data.concat(s" $readByte ")
