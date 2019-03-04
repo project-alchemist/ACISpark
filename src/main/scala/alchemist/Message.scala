@@ -4,6 +4,9 @@ import scala.reflect.ClassTag
 import java.nio.{Buffer, ByteBuffer, ByteOrder}
 import java.nio.charset.StandardCharsets
 
+import org.apache.spark.mllib.linalg.DenseVector
+import org.apache.spark.mllib.linalg.distributed.IndexedRow
+
 class Message() {
 
   val headerLength: Int = 10
@@ -75,7 +78,7 @@ class Message() {
   def previewNextDatatype: Byte = messageBuffer.get(messageBuffer.asInstanceOf[Buffer].position)
 
   def getArrayID: ArrayID = {
-    ArrayID(messageBuffer.get)
+    ArrayID(messageBuffer.getShort)
   }
 
   def getWorkerID: Short = {
@@ -103,18 +106,33 @@ class Message() {
     new String(getByteArray(strLength.asInstanceOf[Int]), StandardCharsets.UTF_8)
   }
 
+  def getIndexedRow: IndexedRow = {
+    val index: Long = messageBuffer.getLong
+    val length: Long = messageBuffer.getLong
+    val values: Array[Double] = Array.fill[Double](length.toInt)(0.0)
+    for (i <- 0 until length.toInt)
+      values(i) = messageBuffer.getDouble
+
+    println(s"Blah")
+
+    new IndexedRow(index, new DenseVector(values))
+  }
+
   def getArrayInfo: ArrayHandle = {
     val ID: ArrayID = getArrayID
-    val nameLength: Int = messageBuffer.getInt
     val name: String = getString
     val numRows: Long = messageBuffer.getLong
     val numCols: Long = messageBuffer.getLong
     val sparse: Byte = messageBuffer.get
     val layout: Byte = messageBuffer.get
-    val numPartitions: Byte = messageBuffer.get
-    val workerLayout: Array[Byte] = getByteArray(numPartitions)
+    val numPartitions: Short = messageBuffer.getShort
+    var workerAssignments: Map[Short, Long] = Map.empty[Short, Long]
 
-    new ArrayHandle(ID, name, numRows, numCols, sparse, numPartitions, workerLayout)
+    (0 until numPartitions).foreach (_ =>
+      workerAssignments = workerAssignments + (messageBuffer.getShort -> messageBuffer.getLong)
+    )
+
+    new ArrayHandle(ID, name, numRows, numCols, sparse, layout, numPartitions, workerAssignments)
   }
 
   @throws(classOf[InconsistentDatatypeException])
@@ -317,6 +335,20 @@ class Message() {
   }
 
   @throws(classOf[InconsistentDatatypeException])
+  def readIndexedRow: IndexedRow = {
+
+    val code = messageBuffer.get
+
+    if (code != Datatype.IndexedRow.value) {
+      messageBuffer.asInstanceOf[Buffer].position(messageBuffer.asInstanceOf[Buffer].position - 1)
+      val message: String = s"Actual datatype ${Datatype.withValue(code).label} does not match expected datatype ${Datatype.IndexedRow.label}"
+      throw new InconsistentDatatypeException(message)
+    }
+
+    getIndexedRow
+  }
+
+  @throws(classOf[InconsistentDatatypeException])
   def readArrayInfo: ArrayHandle = {
 
     val code = messageBuffer.get
@@ -460,8 +492,7 @@ class Message() {
 
   def writeString(value: String): this.type = {
     messageBuffer.put(Datatype.String.value)
-                 .putShort(value.length.asInstanceOf[Short])
-                 .put(value.getBytes(StandardCharsets.UTF_8).array)
+    putString(value)
 
     this
   }
@@ -473,9 +504,35 @@ class Message() {
     this
   }
 
+  def writeIndexedRow(index: Long, length: Long, values: Array[Double]): this.type = {
+    messageBuffer.put(Datatype.IndexedRow.value)
+      .putLong(index)
+      .putLong(length)
+    values foreach (v => messageBuffer.putDouble(v))
+
+    this
+  }
+
   def writeArrayID(value: ArrayID): this.type = {
     messageBuffer.put(Datatype.ArrayID.value)
                  .putShort(value.value)
+
+    this
+  }
+
+  def putString(value: String): ByteBuffer = {
+    messageBuffer.putShort(value.length.asInstanceOf[Short])
+      .put(value.getBytes(StandardCharsets.UTF_8).array)
+  }
+
+  def writeArrayInfo(value: ArrayHandle): this.type = {
+    messageBuffer.put(Datatype.ArrayInfo.value).putShort(value.id.value)
+    putString(value.name)
+      .putLong(value.numRows)
+      .putLong(value.numCols)
+      .put(value.sparse)
+      .put(value.layout)
+      .putShort(value.numPartitions)
 
     this
   }
@@ -578,10 +635,11 @@ class Message() {
           case Datatype.LibraryID.value => data = data.concat(s" $readLibraryID ")
           case Datatype.WorkerID.value => data = data.concat(s" $readWorkerID ")
           case Datatype.WorkerInfo.value => data = data.concat(s" ${readWorkerInfo.toString(true)}")
-          case Datatype.ArrayID.value => data = data.concat(s" ${readArrayID} ")
-          case Datatype.ArrayInfo.value => data = data.concat(s" ${readArrayInfo.toString}")
+          case Datatype.ArrayID.value => data = data.concat(s" ${readArrayID.value} ")
+          case Datatype.ArrayInfo.value => data = data.concat(s" ${readArrayInfo.toString(true)}")
           case Datatype.ArrayBlockFloat.value => data = data.concat(s" ${readArrayBlockFloat.toString(space + "                            ")}")
           case Datatype.ArrayBlockDouble.value => data = data.concat(s" ${readArrayBlockDouble.toString(space + "                            ")}")
+          case Datatype.IndexedRow.value => data = data.concat(s" ${readIndexedRow.toString}")
           case Datatype.Parameter.value => data = data.concat(s" ${readParameter}")
           case _ => println("Unknown type")
         }

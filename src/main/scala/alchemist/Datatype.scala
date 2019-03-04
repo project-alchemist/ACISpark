@@ -54,6 +54,7 @@ private[alchemist] object Datatype extends ByteEnum[Datatype] {
   final case object ArrayInfo extends Datatype(54, "ARRAY INFO")
   final case object ArrayBlockFloat extends Datatype(55, "ARRAY BLOCK FLOAT")
   final case object ArrayBlockDouble extends Datatype(56, "ARRAY BLOCK DOUBLE")
+  final case object IndexedRow extends Datatype(57, "INDEXED ROW")
 
   final case object Parameter extends Datatype(100, "PARAMETER")
 }

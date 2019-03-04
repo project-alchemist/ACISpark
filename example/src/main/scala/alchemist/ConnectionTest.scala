@@ -2,7 +2,12 @@ package alchemist
 
 //import alchemist.{AlchemistSession}
 //import alchemist.AlchemistSession.driver
+import org.apache.spark.mllib.linalg.DenseVector
+import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
+
+import scala.collection.Map
 
 object ConnectionTest {
 
@@ -41,5 +46,28 @@ object ConnectionTest {
     val v = outArgs.get[String]("vv")
     println(s"new_rank = ${new_rank}")
     println(s"vv = ${v}")
+
+    val mat: IndexedRowMatrix = randomData(spark, 10, 5)
+
+    als.printIndexedRowMatrix(mat).sendIndexedRowMatrix(mat)
+
+  }
+
+  def randomData(spark: SparkSession, numRows: Long, numCols: Long): IndexedRowMatrix = {
+    // Generate random dataset
+    val sc = spark.sparkContext
+    val r = new scala.util.Random(1000L)
+
+    val startTime = System.nanoTime()
+
+    val indexedRows: RDD[IndexedRow] = sc.parallelize((0L to numRows - 1)
+      .map(x => new IndexedRow(x, new DenseVector(Array.fill(numCols.toInt)(r.nextDouble())))))
+
+    val data = new IndexedRowMatrix(indexedRows)
+
+    println(s"Time to generate data: ${(System.nanoTime() - startTime) * 1.0E-9}")
+    println(" ")
+
+    data
   }
 }

@@ -1,7 +1,7 @@
 package alchemist
 
 import scala.io.Source
-import org.apache.spark.mllib.linalg.distributed.IndexedRow
+import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.Map
@@ -19,7 +19,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 // spark-mllib
 import org.apache.spark.mllib.linalg.DenseVector
-import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix, RowMatrix}
+import org.apache.spark.mllib.linalg.distributed.{DistributedMatrix, IndexedRow, IndexedRowMatrix, RowMatrix}
 import scala.math.max
 
 
@@ -32,7 +32,7 @@ object AlchemistSession {
   var connected: Boolean = false
 
   val driver: DriverClient = new DriverClient()
-  var workers: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
+  var workers: Map[Short, WorkerInfo] = Map.empty[Short, WorkerInfo]
   var libraries: Map[Byte, LibraryHandle] = Map.empty[Byte, LibraryHandle]
 
   var spark: SparkSession = _
@@ -152,9 +152,7 @@ object AlchemistSession {
 
   def yieldWorkers(): this.type = {
 
-    if (connected) {
-      driver.yieldWorkers()
-    }
+    if (connected) driver.yieldWorkers()
 
     this
   }
@@ -165,94 +163,141 @@ object AlchemistSession {
     driver.runTask(lib, name, inArgs)
   }
 
-  def getArrayHandle(mat: IndexedRowMatrix): ArrayHandle = driver.sendArrayInfo(mat.numRows, mat.numCols)
+  def getArrayHandle(mat: DistributedMatrix, name: String = ""): ArrayHandle =
+    driver.sendArrayInfo(name, mat.numRows, mat.numCols)
 
   def sendIndexedRowMatrix(mat: IndexedRowMatrix): ArrayHandle = {
 
-    val mh = getArrayHandle(mat)
+    val ah: ArrayHandle = getArrayHandle(mat)
+
+    val ahID: ArrayID = ah.id
+    val ahNumPartitions: Long = ah.numPartitions.toLong
+    val ahWorkerAssignments = ah.workerAssignments
+
+    println(s"POL ${ah.numPartitions}")
 
     mat.rows.mapPartitionsWithIndex { (idx, part) =>
       val rows = part.toArray
 
-      var connected: Int = 0
-      var workers: Map[Byte, WorkerClient] = Map.empty[Byte, WorkerClient]
+      rows foreach { r => println(s"${idx} Rows ${r}") }
 
-      workers.foreach(w => workers += (w._1 -> new WorkerClient(w._1, w._2.hostname, w._2.address, w._2.port)))
+      var workerClients: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
 
-      workers.foreach(w => {
-        if (w._2.connect()) connected += 1
+      var connectedWorkers: Int = 0
+      workers foreach (w => {
+        val wc: WorkerClient = new WorkerClient(w._2.ID, w._2.hostname, w._2.address, w._2.port)
+        workerClients += (w._1 -> wc)
+//        if (wc.connect) connectedWorkers += 1
       })
 
-      if (connected == workers.size) {
-        workers.foreach(w => w._2.startSendArrayBlocks(mh.id.value))
+      workerClients foreach (w => if (w._2.connect) connectedWorkers += 1)
 
-        rows.foreach(row => {
-          lazy val elements = row.vector.toArray
-          val index: Long = row.index
-          workers(mh.workerLayout(index.toInt)).addSendArrayBlock(Array(index,index,0,elements.length-1), elements)
+      if (connectedWorkers == workerClients.size) {
+        println(s"Connected to ${connectedWorkers} workers")
+
+        workerClients foreach (w => {
+          println(s"tt ${w._2.clientID} ${w._2.ID}")
+          w._2.startSendIndexedRows(ahID)
         })
 
-        workers.foreach(w => w._2.finishSendArrayBlocks.disconnectFromAlchemist)
+        rows foreach (row => {
+          val default = (0.toShort, 0l)
+          val wID: Short = ahWorkerAssignments.find(_._2 == (row.index % ahNumPartitions)).getOrElse(default)._1
+          println(s"vvvvvv to ${row.index} ${wID}")
+          workerClients(wID).addIndexedRow(row)
+        })
+
+        workerClients foreach (w => {
+          println(s"uu ${w._2.clientID} ${w._2.ID}")
+          w._2.finishSendIndexedRows
+        })
+
+        println(s"Finished sending data")
       }
 
+      println(s"Finished sending data 1")
       part
     }.count
+    println(s"Finished sending data3")
 
-    mh
+    ah
   }
 
   def getIndexedRowMatrix(mh: ArrayHandle): IndexedRowMatrix = {
+    // Generate random dataset
+    val sc = spark.sparkContext
+    val r = new scala.util.Random(1000L)
 
-    val layout: RDD[IndexedRow] = spark.sparkContext.parallelize(
-      (0l until mh.numRows).map(i => {
-        new IndexedRow(i, new DenseVector(new Array[Double](1)))
-      }), spark.sparkContext.defaultParallelism)
+    val startTime = System.nanoTime()
 
-    val indexedRows: RDD[IndexedRow] = layout.mapPartitionsWithIndex({ (idx, part) =>
-      val rows = part.toArray
+    val indexedRows: RDD[IndexedRow] = sc.parallelize((0L to mh.numRows - 1)
+      .map(x => new IndexedRow(x, new DenseVector(Array.fill(mh.numCols.toInt)(r.nextDouble())))))
 
-      var connected: Int = 0
-      var workers: Map[Byte, WorkerClient] = Map.empty[Byte, WorkerClient]
+    val data = new IndexedRowMatrix(indexedRows)
 
-      workers.foreach(w => workers += (w._1 -> new WorkerClient(w._1, w._2.hostname, w._2.address, w._2.port)))
+    println(s"Time to generate data: ${(System.nanoTime() - startTime) * 1.0E-9}")
+    println(" ")
 
-      workers.foreach(w => {
-        if (w._2.connect()) connected += 1
-      })
-
-      var currentRowIter: Iterator[IndexedRow] = rows.map(row => new IndexedRow(row.index, row.vector)).iterator
-
-      if (connected == workers.size) {
-        workers.foreach(w => w._2.startRequestArrayBlocks(mh.id.value))
-
-        rows.foreach(row => {
-          val index: Long = row.index
-          workers(mh.workerLayout(index.toInt)).addRequestedArrayBlock(Array(index,index,0,mh.numCols-1))
-        })
-
-        workers.foreach(w => w._2.finishRequestArrayBlocks)
-
-        currentRowIter = rows.map(row => {
-          val index: Long = row.index
-          new IndexedRow(index, workers(mh.workerLayout(index.toInt)).getRequestedArrayBlock(Array(index,index,0,mh.numCols-1)))
-        }).iterator
-
-        workers.foreach(w => w._2.disconnectFromAlchemist)
-      }
-
-      currentRowIter
-    }, preservesPartitioning = true)
-
-    new IndexedRowMatrix(indexedRows, mh.numRows, mh.numCols.toInt)
+    data
   }
 
-  def sendRowMatrix(mat: RowMatrix): ArrayHandle = getArrayHandle(mat)
+//    : IndexedRowMatrix = {
 
-  def getArrayHandle(mat: RowMatrix): ArrayHandle = driver.sendArrayInfo(mat.numRows, mat.numCols)
+//    val layout: RDD[IndexedRow] = spark.sparkContext.parallelize(
+//      (0l until mh.numRows).map(i => {
+//        new IndexedRow(i, new DenseVector(new Array[Double](1)))
+//      }), spark.sparkContext.defaultParallelism)
+//
+//    val indexedRows: RDD[IndexedRow] = layout.mapPartitionsWithIndex({ (idx, part) =>
+//      val rows = part.toArray
+//
+//      var connected: Int = 0
+//      var workers: Map[Byte, WorkerClient] = Map.empty[Byte, WorkerClient]
+//
+//      workers.foreach(w => workers += (w._1 -> new WorkerClient(w._1, w._2.hostname, w._2.address, w._2.port)))
+//
+//      workers.foreach(w => {
+//        if (w._2.connect()) connected += 1
+//      })
+//
+//      var currentRowIter: Iterator[IndexedRow] = rows.map(row => new IndexedRow(row.index, row.vector)).iterator
+//
+//      if (connected == workers.size) {
+//        workers.foreach(w => w._2.startRequestArrayBlocks(mh.id.value))
+//
+//        rows.foreach(row => {
+//          val index: Long = row.index
+//          workers(mh.workerLayout(index.toInt)).addRequestedArrayBlock(Array(index,index,0,mh.numCols-1))
+//        })
+//
+//        workers.foreach(w => w._2.finishRequestArrayBlocks)
+//
+//        currentRowIter = rows.map(row => {
+//          val index: Long = row.index
+//          new IndexedRow(index, workers(mh.workerLayout(index.toInt)).getRequestedArrayBlock(Array(index,index,0,mh.numCols-1)))
+//        }).iterator
+//
+//        workers.foreach(w => w._2.disconnectFromAlchemist)
+//      }
+//
+//      currentRowIter
+//    }, preservesPartitioning = true)
+
+//    new IndexedRowMatrix(indexedRows, mh.numRows, mh.numCols.toInt)
+//  }
+
+  def sendRowMatrix(mat: RowMatrix): ArrayHandle = getArrayHandle(mat)
 
   def sendTestString: this.type = {
     println("Sending test string to Alchemist")
     driver.sendTestString("This is a test string from ACISpark")
+
+    this
+  }
+
+  def printIndexedRowMatrix(mat: IndexedRowMatrix): this.type = {
+
+    mat.rows.mapPartitionsWithIndex((idx, iterator) => iterator.map( v => (idx, v))).foreach(v => println(v))
 
     this
   }
@@ -316,7 +361,7 @@ object AlchemistSession {
 
   def close: this.type = {
     driver.close
-    workers.foreach(p => p._2.close)
+//    workers.foreach(p => p._2.close)
 
     this
   }

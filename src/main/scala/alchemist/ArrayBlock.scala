@@ -1,5 +1,6 @@
 package alchemist
 
+
 class ArrayBlockDouble(val dims: Array[Array[Long]] = Array.empty[Array[Long]],
                                val data: Array[Double] = Array.empty[Double]) {
 

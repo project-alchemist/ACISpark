@@ -5,8 +5,8 @@ import scala.math.max
 import org.apache.spark.sql.SparkSession
 
 class ArrayHandle(val id: ArrayID = ArrayID(0), val name: String = "", val numRows: Long = 0, val numCols: Long = 0,
-                  val sparse: Byte = 0, val numPartitions: Byte = 0,
-                  val workerLayout: Array[Byte] = Array.empty[Byte]) {
+                  val sparse: Byte = 0, val layout: Byte = 0, val numPartitions: Short = 0,
+                  val workerAssignments: Map[Short, Long] = Map.empty[Short, Long]) {
 
   def getID: ArrayID = id
 
@@ -20,13 +20,13 @@ class ArrayHandle(val id: ArrayID = ArrayID(0), val name: String = "", val numRo
 
   def getSparse: Byte = sparse
 
-  def getNumPartitions: Byte = numPartitions
+  def getNumPartitions: Short = numPartitions
 
-  def getWorkerLayout: Array[Byte] = workerLayout
+  def getWorkerAssignments: Map[Short, Long] = workerAssignments
 
   def getIndexedRowMatrix: IndexedRowMatrix = AlchemistSession.getIndexedRowMatrix(this)
 
-  def meta(displayLayout: Boolean = false): this.type = {
+  def toString(displayLayout: Boolean = false): this.type = {
 
     println(s"Name:                  $name")
     println(s"ID:                    ${id.value}")
@@ -39,7 +39,7 @@ class ArrayHandle(val id: ArrayID = ArrayID(0), val name: String = "", val numRo
     if (displayLayout) {
       print(" ")
       print(s"Layout:")
-      for (i <- workerLayout.indices) println(s"    ${i} ${workerLayout(i)}")
+      workerAssignments foreach { case(k, v) => println(s"    ${k} ${v}")}
     }
 
     this

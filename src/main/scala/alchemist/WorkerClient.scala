@@ -1,126 +1,47 @@
 package alchemist
 
-import org.apache.spark.SparkContext
 import org.apache.spark.mllib.linalg.DenseVector
+import org.apache.spark.mllib.linalg.distributed.IndexedRow
 
-import scala.collection.JavaConverters._
-import scala.util.Random
-import java.io.{FileOutputStream, InputStream, OutputStream, PrintWriter, DataInputStream => JDataInputStream, DataOutputStream => JDataOutputStream}
-import java.net.Socket
-import java.nio.{ByteBuffer, DoubleBuffer}
+class WorkerClient(_ID: Short, _hostname: String, _address: String, _port: Short) extends Client {
 
-import scala.io.Source
-import java.nio.file.{Files, Paths}
-import java.nio.charset.StandardCharsets
-import java.util.{Arrays, Collections}
-
-import scala.compat.Platform.EOL
-
-//class WorkerId(val id: Int)  { }
-
-//class WorkerInfo(val id: Short, val hostname: String, val address: String, val port: Short) {
-//
-//  def connect(): WorkerClient = {
-//    println(s"Connecting to $hostname at $address:$port")
-//    new WorkerClient(hostname, address, port)
-//  }
-//}
-
-// Connects to an Alchemist worker
-class WorkerClient(val ID: Short, val hostname: String, val address: String, val port: Short) {
-
-  var sock: Socket = _
-  var in: InputStream = _
-
-  val writeMessage = new Message
-  val readMessage = new Message
-
-  var clientID: Short = 0
-  var sessionID: Short = 0
-
-//  val sock = java.nio.channels.SocketChannel.open(new java.net.InetSocketAddress(address, port))
-//  println(s"Connected to $hostname at $address:$port")
-//  var outbuf: ByteBuffer = null
-//  var inbuf: ByteBuffer = null
-
-  def connect(): Boolean = {
-    println(s"Connecting to Alchemist at $address:$port")
-
-    sock = new Socket(address, port)
-
-    in = sock.getInputStream
-
-    handshake
+  {
+    ID = _ID
+    hostname = _hostname
+    address = _address
+    port = _port
   }
 
-  def sendMessage: this.type = {
-
-    val ar = writeMessage.finish()
-    Collections.reverse(Arrays.asList(ar))
-
-//    writeMessage.print
-
-    sock.getOutputStream.write(ar)
-    sock.getOutputStream.flush
-
-    receiveMessage
-  }
-
-  def receiveMessage: this.type = {
-
-    val in = sock.getInputStream
-
-    val header: Array[Byte] = Array.fill[Byte](9)(0)
-    val packet: Array[Byte] = Array.fill[Byte](8192)(0)
-
-    in.read(header, 0, 9)
-
-    readMessage.reset
-    readMessage.addHeader(header)
-
-    var remainingBodyLength: Int = readMessage.readBodyLength
-
-    while (remainingBodyLength > 0) {
-      val length: Int = Array(remainingBodyLength, 8192).min
-      in.read(packet, 0, length)
-      //      for (i <- 0 until length)
-      //        System.out.println(s"Datatype (length):    ${packet(i)}")
-      remainingBodyLength -= length
-      readMessage.addPacket(packet, length)
-    }
-
-//    readMessage.print
+  def startSendIndexedRows(id: ArrayID): this.type = {
+    writeMessage.start(clientID, sessionID, Command.SendIndexedRows)
+    writeMessage.writeArrayID(id)
 
     this
   }
 
-  def handshake: Boolean = {
+  def addIndexedRow(index: Long, length: Long, values: Array[Double]): this.type = {
+    writeMessage.writeIndexedRow(index, length, values)
 
-    writeMessage.start(0, 0, Command.Handshake)
-
-    writeMessage.writeByte(2)
-    writeMessage.writeShort(1234)
-    writeMessage.writeString("ABCD")
-
-    sendMessage
-
-    var handshakeSuccess: Boolean = false
-
-    if (readMessage.readCommandCode == 1) {
-      if (readMessage.readShort == 4321) {
-        if (readMessage.readString == "DCBA") {
-          clientID = readMessage.readClientID
-          sessionID = readMessage.readSessionID
-        }
-      }
-    }
-
-    handshakeSuccess
+    this
   }
 
-  def startSendArrayBlocks(id: Short): this.type = {
+  def addIndexedRow(row: IndexedRow): this.type = {
+    writeMessage.writeIndexedRow(row.index.toLong, row.vector.size.toLong, row.vector.toArray)
+
+    this
+  }
+
+  def finishSendIndexedRows: this.type = {
+    sendMessage
+
+    println(s"ggggg")
+
+    this
+  }
+
+  def startSendArrayBlocks(id: ArrayID): this.type = {
     writeMessage.start(clientID, sessionID, Command.SendArrayBlocks)
-    writeMessage.writeShort(id)
+    writeMessage.writeArrayID(id)
 
     this
   }
@@ -165,6 +86,8 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
 
     this
   }
+
+  def close: this.type = disconnectFromAlchemist
 
   override def toString: String = f"Worker-$ID%03d running on $hostname at $address:$port"
 
@@ -240,13 +163,4 @@ class WorkerClient(val ID: Short, val hostname: String, val address: String, val
 //    sendMessage(outbuf)
 //  }
 
-  def disconnectFromAlchemist: this.type = {
-    println(s"Disconnecting from Alchemist")
-    sock.close()
-    this
-  }
-
-  def close(): this.type = {
-    disconnectFromAlchemist
-  }
 }

@@ -34,7 +34,12 @@ object SVDTest {
     println(s"Time cost of starting Spark session: ${(System.nanoTime() - startTime) * 1.0E-9}")
     println(" ")
 
-    val data: IndexedRowMatrix = if (infile.length > 0) loadData(spark, infile) else randomData(spark, 100, 50)
+    val data: IndexedRowMatrix = {
+      if (infile.length > 0)
+        loadData(spark, infile)
+      else
+        randomData(spark, 100, 50)
+    }
 
     // Print info
     println(s"spark.conf.getAll: ${spark.conf.getAll.foreach(println)}")
