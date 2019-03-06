@@ -113,10 +113,16 @@ class Message() {
     for (i <- 0 until length.toInt)
       values(i) = messageBuffer.getDouble
 
-    println(s"Blah")
-
     new IndexedRow(index, new DenseVector(values))
   }
+
+//  def getIndexedRow(row: IndexedRow): IndexedRow = {
+//    row.index = messageBuffer.getLong
+//    val length: Long = messageBuffer.getLong
+//    val values: Array[Double] = Array.fill[Double](length.toInt)(0.0)
+//    for (i <- 0 until length.toInt)
+//      values(i) = messageBuffer.getDouble
+//  }
 
   def getArrayInfo: ArrayHandle = {
     val ID: ArrayID = getArrayID
@@ -572,10 +578,16 @@ class Message() {
     this
   }
 
-  def finish(): Array[Byte] = {
-    updateBodyLength
+  def finish: Array[Byte] = {
+    updateBodyLength.readHeader.resetPosition
 
     messageBuffer.array.slice(0, headerLength + bodyLength)
+  }
+
+  def resetPosition: this.type = {
+    messageBuffer.asInstanceOf[Buffer].position(headerLength)
+
+    this
   }
 
   // ========================================================================================
@@ -585,7 +597,7 @@ class Message() {
     val space: String = "                                              "
 
     readHeader
-    messageBuffer.asInstanceOf[Buffer].position(headerLength)
+    resetPosition
 
     System.out.println()
     System.out.println(s"$space ==================================================================")
@@ -648,7 +660,7 @@ class Message() {
       System.out.println(s"$data")
     }
 
-    messageBuffer.asInstanceOf[Buffer].position(headerLength)
+    resetPosition
 
     System.out.println(s"$space ==================================================================")
 

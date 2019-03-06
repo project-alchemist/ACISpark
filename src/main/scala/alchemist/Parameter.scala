@@ -9,18 +9,18 @@ private[alchemist] case class Parameter[T](name: String, value: T) extends Param
     var datatype: String = ""
     if (withType) {
       datatype = value match {
-        case b: Byte => "BYTE                  "
-        case s: Short => "SHORT                 "
-        case i: Int => "INT                   "
-        case l: Long => "LONG                  "
-        case f: Float => "FLOAT                 "
-        case d: Double => "DOUBLE                "
-        case c: Char => "CHAR                  "
-        case a: String => "STRING                "
-        case o: ArrayID => "ARRAY ID              "
+        case b: Byte => " (BYTE)"
+        case s: Short => " (SHORT)"
+        case i: Int => " (INT)"
+        case l: Long => " (LONG)"
+        case f: Float => " (FLOAT)"
+        case d: Double => " (DOUBLE)"
+        case c: Char => " (CHAR)"
+        case a: String => " (STRING)"
+        case o: ArrayID => " (ARRAY ID)"
       }
     }
-    f"${datatype}${name.concat(":")}%-16s ${value}"
+    f"${name.concat(s"${datatype}:")}%-16s ${value}"
   }
 }
 

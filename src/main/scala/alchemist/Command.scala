@@ -33,12 +33,13 @@ private[alchemist] object Command extends ByteEnum[Command] {
   final case object LoadLibrary extends Command(22,"LOAD LIBRARY")
   final case object UnloadLibrary extends Command(23,"UNLOAD LIBRARY")
 
-  // Matrices
+  // Arrays
   final case object ArrayInfo extends Command(31,"ARRAY INFO")
   final case object ArrayLayout extends Command(32,"ARRAY LAYOUT")
   final case object SendIndexedRows extends Command(33, "SEND INDEXED ROWS")
   final case object SendArrayBlocks extends Command(34, "SEND ARRAY BLOCKS")
-  final case object RequestArrayBlocks extends Command(35,"REQUEST ARRAY BLOCKS")
+  final case object RequestIndexedRows extends Command(35,"REQUEST INDEXED ROWS")
+  final case object RequestArrayBlocks extends Command(36,"REQUEST ARRAY BLOCKS")
 
   // Tasks
   final case object RunTask extends Command(41,"RUN TASK")

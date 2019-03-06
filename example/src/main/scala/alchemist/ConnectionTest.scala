@@ -2,6 +2,7 @@ package alchemist
 
 //import alchemist.{AlchemistSession}
 //import alchemist.AlchemistSession.driver
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix}
 import org.apache.spark.rdd.RDD
@@ -13,13 +14,14 @@ object ConnectionTest {
 
   def run(args: Array[String] = Array.empty[String]): Unit = {
 
+    Logger.getLogger("org").setLevel(Level.OFF)
     val spark = SparkSession
-      .builder()
+      .builder
       .appName("Alchemist Connection Test")
-      .getOrCreate()
+      .getOrCreate
     val startTime = System.nanoTime()
     val als = AlchemistSession
-    //      .initialize(spark)
+          .initialize(spark)
           .connect("0.0.0.0", 24960)
     println(s"Time cost of starting Alchemist session: ${(System.nanoTime() - startTime) * 1.0E-9}")
     println(" ")
@@ -47,9 +49,20 @@ object ConnectionTest {
     println(s"new_rank = ${new_rank}")
     println(s"vv = ${v}")
 
-    val mat: IndexedRowMatrix = randomData(spark, 10, 5)
+    val mat: IndexedRowMatrix = randomData(spark, 20, 5)
 
-    als.printIndexedRowMatrix(mat).sendIndexedRowMatrix(mat)
+    val matHandle = als.printIndexedRowMatrix(mat).sendIndexedRowMatrix(mat)
+
+    val matCopy: IndexedRowMatrix = als.getIndexedRowMatrix(matHandle)
+
+    println("Original IndexedRowMatrix:")
+    als.printIndexedRowMatrix(mat)
+
+    println("IndexedRowMatrix returned from Alchemist:")
+    als.printIndexedRowMatrix(matCopy)
+
+    spark.stop
+    als.stop
 
   }
 

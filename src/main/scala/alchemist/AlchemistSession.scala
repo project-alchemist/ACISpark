@@ -41,17 +41,17 @@ object AlchemistSession {
 
   def main(args: Array[String]) {
 
-//    initialize
-//    connect("0.0.0.0", 24960)
-//    if (connected) {
-//      println("Connected to Alchemist")
-//    } else {
-//      println("Unable to connect to Alchemist")
-//    }
+    //    initialize
+    //    connect("0.0.0.0", 24960)
+    //    if (connected) {
+    //      println("Connected to Alchemist")
+    //    } else {
+    //      println("Unable to connect to Alchemist")
+    //    }
 
-//    requestWorkers(2)
+    //    requestWorkers(2)
 
-//    stop
+    //    stop
   }
 
   def initialize(_spark: SparkSession): this.type = {
@@ -61,7 +61,7 @@ object AlchemistSession {
   }
 
   def createRandomRDD(nRows: Int, nCols: Int, ss: SparkSession): RDD[Array[Array[Double]]] = {
-    val randomArray = Array.ofDim[Double](nRows,nCols)
+    val randomArray = Array.ofDim[Double](nRows, nCols)
 
     val rnd = new Random(123)
 
@@ -85,15 +85,17 @@ object AlchemistSession {
       return lh
     }
     catch {
-      case e: LibraryNotFoundException => { println(e.getMessage)
-        return LibraryHandle(0, "", "") }
+      case e: LibraryNotFoundException => {
+        println(e.getMessage)
+        return LibraryHandle(0, "", "")
+      }
     }
 
-//    var classLoader = new java.net.URLClassLoader(
-//      Array(new File(jar).toURI.toURL),
-//      this.getClass.getClassLoader)
-//
-//    var c = classLoader.loadClass(s"${name.toLowerCase}.${name}")
+    //    var classLoader = new java.net.URLClassLoader(
+    //      Array(new File(jar).toURI.toURL),
+    //      this.getClass.getClassLoader)
+    //
+    //    var c = classLoader.loadClass(s"${name.toLowerCase}.${name}")
   }
 
   def connect(_address: String = "", _port: Int = 0): this.type = {
@@ -160,7 +162,10 @@ object AlchemistSession {
   def runTask(lib: LibraryHandle, name: String, inArgs: Parameters): Parameters = {
 
     print(s"Alchemist started task '$name' ... ")
-    driver.runTask(lib, name, inArgs)
+    val outArgs: Parameters = driver.runTask(lib, name, inArgs)
+    println("done")
+
+    outArgs
   }
 
   def getArrayHandle(mat: DistributedMatrix, name: String = ""): ArrayHandle =
@@ -174,12 +179,8 @@ object AlchemistSession {
     val ahNumPartitions: Long = ah.numPartitions.toLong
     val ahWorkerAssignments = ah.workerAssignments
 
-    println(s"POL ${ah.numPartitions}")
-
     mat.rows.mapPartitionsWithIndex { (idx, part) =>
       val rows = part.toArray
-
-      rows foreach { r => println(s"${idx} Rows ${r}") }
 
       var workerClients: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
 
@@ -187,104 +188,93 @@ object AlchemistSession {
       workers foreach (w => {
         val wc: WorkerClient = new WorkerClient(w._2.ID, w._2.hostname, w._2.address, w._2.port)
         workerClients += (w._1 -> wc)
-//        if (wc.connect) connectedWorkers += 1
+        if (wc.connect(idx)) connectedWorkers += 1
       })
 
-      workerClients foreach (w => if (w._2.connect) connectedWorkers += 1)
-
       if (connectedWorkers == workerClients.size) {
-        println(s"Connected to ${connectedWorkers} workers")
+        println(s"Spark executor ${idx}: Connected to ${connectedWorkers} Alchemist workers")
 
         workerClients foreach (w => {
-          println(s"tt ${w._2.clientID} ${w._2.ID}")
           w._2.startSendIndexedRows(ahID)
         })
 
         rows foreach (row => {
           val default = (0.toShort, 0l)
           val wID: Short = ahWorkerAssignments.find(_._2 == (row.index % ahNumPartitions)).getOrElse(default)._1
-          println(s"vvvvvv to ${row.index} ${wID}")
           workerClients(wID).addIndexedRow(row)
         })
 
         workerClients foreach (w => {
-          println(s"uu ${w._2.clientID} ${w._2.ID}")
-          w._2.finishSendIndexedRows
-        })
+          val numRows: Long = w._2.finishSendIndexedRows
 
-        println(s"Finished sending data")
+          println(s"Spark executor ${idx}: Alchemist received $numRows rows for Array ${ahID.value}")
+        })
       }
 
-      println(s"Finished sending data 1")
+      println(s"Spark executor ${idx}: Finished sending data")
+
       part
     }.count
-    println(s"Finished sending data3")
+
+    println(s"Finished sending data")
 
     ah
   }
 
-  def getIndexedRowMatrix(mh: ArrayHandle): IndexedRowMatrix = {
-    // Generate random dataset
-    val sc = spark.sparkContext
-    val r = new scala.util.Random(1000L)
+  def getIndexedRowMatrix(ah: ArrayHandle): IndexedRowMatrix = {
 
-    val startTime = System.nanoTime()
+    val rowIndices: RDD[Long] = spark.sparkContext.parallelize(0l until ah.numRows)
 
-    val indexedRows: RDD[IndexedRow] = sc.parallelize((0L to mh.numRows - 1)
-      .map(x => new IndexedRow(x, new DenseVector(Array.fill(mh.numCols.toInt)(r.nextDouble())))))
+    val ahID: ArrayID = ah.id
+    val ahNumPartitions: Long = ah.numPartitions.toLong
+    val ahWorkerAssignments = ah.workerAssignments
 
-    val data = new IndexedRowMatrix(indexedRows)
+    new IndexedRowMatrix(
+      spark.sparkContext.union(
+        rowIndices.mapPartitionsWithIndex { (idx, part) => {
+          val rows = part.toArray
 
-    println(s"Time to generate data: ${(System.nanoTime() - startTime) * 1.0E-9}")
-    println(" ")
+          var workerClients: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
 
-    data
+          var connectedWorkers: Int = 0
+          workers foreach (w => {
+            val wc: WorkerClient = new WorkerClient(w._2.ID, w._2.hostname, w._2.address, w._2.port)
+            workerClients += (w._1 -> wc)
+            if (wc.connect(idx)) connectedWorkers += 1
+          })
+
+          var requestedIndexedRows: Array[IndexedRow] = Array.empty[IndexedRow]
+
+          if (connectedWorkers == workerClients.size) {
+            println(s"Spark executor ${idx}: Connected to ${connectedWorkers} Alchemist workers")
+
+            workerClients foreach (w => {
+              w._2.startRequestIndexedRows(ahID)
+            })
+
+            rows foreach (row => {
+              val default = (0.toShort, 0l)
+              val wID: Short = ahWorkerAssignments.find(_._2 == (row % ahNumPartitions)).getOrElse(default)._1
+              workerClients(wID).requestIndexedRow(row)
+            })
+
+            workerClients foreach (w => {
+              val returnedRows: Array[IndexedRow] = w._2.finishRequestIndexedRows
+
+              var row_text: String = "row"
+              if (returnedRows.length > 1)
+                row_text += "s"
+              println(s"Spark executor ${idx}: Alchemist worker ${w._2.ID} returned ${returnedRows.length} ${row_text} for Array ${ahID.value}")
+              requestedIndexedRows = requestedIndexedRows ++ returnedRows
+            })
+
+            println(s"Spark executor ${idx}: Finished receiving data")
+          }
+
+          requestedIndexedRows.iterator
+        }
+        }))
   }
-
-//    : IndexedRowMatrix = {
-
-//    val layout: RDD[IndexedRow] = spark.sparkContext.parallelize(
-//      (0l until mh.numRows).map(i => {
-//        new IndexedRow(i, new DenseVector(new Array[Double](1)))
-//      }), spark.sparkContext.defaultParallelism)
-//
-//    val indexedRows: RDD[IndexedRow] = layout.mapPartitionsWithIndex({ (idx, part) =>
-//      val rows = part.toArray
-//
-//      var connected: Int = 0
-//      var workers: Map[Byte, WorkerClient] = Map.empty[Byte, WorkerClient]
-//
-//      workers.foreach(w => workers += (w._1 -> new WorkerClient(w._1, w._2.hostname, w._2.address, w._2.port)))
-//
-//      workers.foreach(w => {
-//        if (w._2.connect()) connected += 1
-//      })
-//
-//      var currentRowIter: Iterator[IndexedRow] = rows.map(row => new IndexedRow(row.index, row.vector)).iterator
-//
-//      if (connected == workers.size) {
-//        workers.foreach(w => w._2.startRequestArrayBlocks(mh.id.value))
-//
-//        rows.foreach(row => {
-//          val index: Long = row.index
-//          workers(mh.workerLayout(index.toInt)).addRequestedArrayBlock(Array(index,index,0,mh.numCols-1))
-//        })
-//
-//        workers.foreach(w => w._2.finishRequestArrayBlocks)
-//
-//        currentRowIter = rows.map(row => {
-//          val index: Long = row.index
-//          new IndexedRow(index, workers(mh.workerLayout(index.toInt)).getRequestedArrayBlock(Array(index,index,0,mh.numCols-1)))
-//        }).iterator
-//
-//        workers.foreach(w => w._2.disconnectFromAlchemist)
-//      }
-//
-//      currentRowIter
-//    }, preservesPartitioning = true)
-
-//    new IndexedRowMatrix(indexedRows, mh.numRows, mh.numCols.toInt)
-//  }
 
   def sendRowMatrix(mat: RowMatrix): ArrayHandle = getArrayHandle(mat)
 
@@ -297,7 +287,7 @@ object AlchemistSession {
 
   def printIndexedRowMatrix(mat: IndexedRowMatrix): this.type = {
 
-    mat.rows.mapPartitionsWithIndex((idx, iterator) => iterator.map( v => (idx, v))).foreach(v => println(v))
+    mat.rows.mapPartitionsWithIndex((idx, iterator) => iterator.map(v => (idx, v))).foreach(v => println(v))
 
     this
   }
@@ -353,80 +343,9 @@ object AlchemistSession {
 
   def stop: this.type = {
 
-    yieldWorkers
     println("Ending Alchemist session")
-
-    this
-  }
-
-  def close: this.type = {
     driver.close
-//    workers.foreach(p => p._2.close)
 
     this
   }
-
-  //  def setSparkContext(_sc: SparkContext) {
-  //    sc = _sc
-  //  }
-  //
-  //  def run(libraryName: String, funName: String, inputParams: Parameters): Parameters = {
-  //    client.runCommand(libraryName, funName, inputParams)
-  //  }
-//
-//  // Caches result by default, because may not want to recreate (e.g. if delete referenced matrix on Alchemist side to save memory)
-//  def getIndexedRowMatrix(handle: ArrayHandle): IndexedRowMatrix = {
-//    val (numRows, numCols) = getDimensions(handle)
-//    // TODO:
-//    // should map the rows back to the executors using locality information if possible
-//    // otherwise shuffle the rows on the MPI side before sending them back to SPARK
-//    val numPartitions = max(sc.defaultParallelism, client.workerCount)
-//    val sacrificialRDD = sc.parallelize(0 until numRows.toInt, numPartitions)
-//    val layout: Array[WorkerId] = (0 until sacrificialRDD.partitions.size).map(x => new WorkerId(x % client.workerCount)).toArray
-//    val fullLayout: Array[WorkerId] = (layout zip sacrificialRDD.mapPartitions(iter => Iterator.single(iter.size), true)
-//                                          .collect())
-//                                          .flatMap{ case (workerid, partitionSize) => Array.fill(partitionSize)(workerid) }
-//
-//    client.getIndexedRowMatrix(handle, fullLayout)
-//    val rows = sacrificialRDD.mapPartitionsWithIndex( (idx, rowindices) => {
-//      val worker = context.connectWorker(layout(idx))
-//      val result = rowindices.toList.map { rowIndex =>
-//        new IndexedRow(rowIndex, worker.getIndexedRowMatrixRow(handle, rowIndex, numCols))
-//      }.iterator
-//      worker.close()
-//      result
-//    }, preservesPartitioning = true)
-//    val result = new IndexedRowMatrix(rows, numRows, numCols)
-//    result.rows.cache()
-//    result.rows.count
-//    result
-//  }
-//
-//  def readHDF5(fname: String, varname: String): ArrayHandle = client.readHDF5(fname, varname)
-//
-//  def getDimensions(handle: ArrayHandle): Tuple2[Long, Int] = client.getArrayDimensions(handle)
-//
-//  def transpose(mat: IndexedRowMatrix): IndexedRowMatrix = {
-//    getIndexedRowMatrix(client.getTranspose(getArrayHandle(mat)))
-//  }
-//
-//  def matrixMultiply(matA: IndexedRowMatrix, matB: IndexedRowMatrix): (IndexedRowMatrix, Array[Double]) = {
-//
-//    var t1 = System.nanoTime()
-//    val handleA = getArrayHandle(matA)
-//    val handleB = getArrayHandle(matB)
-//    val t2 = System.nanoTime() - t1
-//
-//    t1 = System.nanoTime()
-//    val handleC = client.matrixMultiply(handleA, handleB)
-//    val t3 = System.nanoTime() - t1
-//
-//    t1 = System.nanoTime()
-//    val matC = getIndexedRowMatrix(handleC)
-//    val t4 = System.nanoTime() - t1
-//
-//    (matC, Array(t2, t3, t4))
-//  }
-//
-//  def stop() = driver.stop()
 }

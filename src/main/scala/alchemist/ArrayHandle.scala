@@ -37,8 +37,7 @@ class ArrayHandle(val id: ArrayID = ArrayID(0), val name: String = "", val numRo
     println(s"Sparse:                $sparse")
     println(s"Number of partitions:  $numPartitions")
     if (displayLayout) {
-      print(" ")
-      print(s"Layout:")
+      println(s"Layout:")
       workerAssignments foreach { case(k, v) => println(s"    ${k} ${v}")}
     }
 

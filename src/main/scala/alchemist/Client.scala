@@ -24,10 +24,13 @@ class Client {
   val readMessage = new Message
 
 
-  def connect: Boolean = {
+  def connect(idx: Int = -1): Boolean = {
 
     try {
-      println(s"Connecting to Alchemist at $address:$port")
+      if (idx < 0)
+        println(s"Connecting to Alchemist at $address:$port")
+      else
+        println(s"Spark executor ${idx}: Connecting to Alchemist at $address:$port")
 
       sock = new Socket(address, port)
 
@@ -48,23 +51,20 @@ class Client {
     address = _address
     port = _port
 
-    connect
+    connect(-1)
   }
 
   def sendMessage: this.type = {
 
-    val ar = writeMessage.finish()
+    val ar = writeMessage.finish
     Collections.reverse(Arrays.asList(ar))
 
-    writeMessage.print
+//    writeMessage.print
 
     sock.getOutputStream.write(ar)
     sock.getOutputStream.flush
 
-    println("uy 1")
-
     receiveMessage
-    println("uy 2")
 
     this
   }
@@ -86,13 +86,12 @@ class Client {
     while (remainingBodyLength > 0) {
       val length: Int = Array(remainingBodyLength, 8192).min
       in.read(packet, 0, length)
-      //      for (i <- 0 until length)
-      //        System.out.println(s"Datatype (length):    ${packet(i)}")
       remainingBodyLength -= length
       readMessage.addPacket(packet, length)
     }
 
-    readMessage.print
+    readMessage.readHeader.resetPosition
+//    readMessage.print
 
     this
   }

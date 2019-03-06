@@ -35,8 +35,6 @@ class DriverClient extends Client {          // Connects to the Alchemist driver
       }
     }
 
-    outArgs.add[Int]("rank", 32)
-
     outArgs
   }
 
@@ -101,8 +99,6 @@ class DriverClient extends Client {          // Connects to the Alchemist driver
     writeMessage.start(clientID, sessionID, Command.YieldWorkers)
 
     sendMessage
-
-    val message: String = readMessage.readString
 
     yieldedWorkers
   }
@@ -228,7 +224,7 @@ class DriverClient extends Client {          // Connects to the Alchemist driver
   }
 
   def close: this.type = {
-    yieldWorkers()
+//    yieldWorkers
     disconnectFromAlchemist
   }
 

@@ -31,12 +31,37 @@ class WorkerClient(_ID: Short, _hostname: String, _address: String, _port: Short
     this
   }
 
-  def finishSendIndexedRows: this.type = {
+  def finishSendIndexedRows: Long = {
     sendMessage
 
-    println(s"ggggg")
+    val arrayID: ArrayID = readMessage.readArrayID
+    readMessage.readLong
+  }
+
+  def startRequestIndexedRows(id: ArrayID): this.type = {
+    writeMessage.start(clientID, sessionID, Command.RequestIndexedRows)
+    writeMessage.writeArrayID(id)
 
     this
+  }
+
+  def requestIndexedRow(index: Long): this.type = {
+    writeMessage.writeLong(index)
+
+    this
+  }
+
+  def finishRequestIndexedRows: Array[IndexedRow] = {
+    sendMessage
+
+    val arrayID: ArrayID = readMessage.readArrayID
+
+    var rows: Array[IndexedRow] = Array.empty[IndexedRow]
+
+    while (!readMessage.eom)
+      rows = rows :+ readMessage.readIndexedRow
+
+    rows
   }
 
   def startSendArrayBlocks(id: ArrayID): this.type = {
