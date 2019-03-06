@@ -1,32 +1,23 @@
 package alchemist
 
-import scala.io.Source
-import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix}
-
-import scala.collection.mutable.ArrayBuffer
 import scala.collection.Map
 import scala.collection.immutable.Seq
 import scala.util.Random
-import java.lang.reflect.Method
-import java.io.{BufferedReader, File, FileInputStream, InputStreamReader, DataInputStream => JDataInputStream, DataOutputStream => JDataOutputStream}
+import java.io.{BufferedReader, FileInputStream, InputStreamReader, DataInputStream => JDataInputStream, DataOutputStream => JDataOutputStream}
 
 // spark-core
 import org.apache.spark.rdd.RDD
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
-import org.apache.spark.SparkConf
 // spark-sql
 import org.apache.spark.sql.SparkSession
 // spark-mllib
-import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.linalg.distributed.{DistributedMatrix, IndexedRow, IndexedRowMatrix, RowMatrix}
-import scala.math.max
 
 
 case class ArrayID(value: Short)
 
 
 object AlchemistSession {
+
   println("Starting Alchemist session")
 
   var connected: Boolean = false
