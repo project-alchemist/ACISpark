@@ -1,8 +1,8 @@
 package alchemist
 
-case class LibraryHandle(id: Byte, name: String, path: String) {
+case class LibraryHandle(id: LibraryID = LibraryID(0), name: String = "", path: String = "") {
 
-  def getID: Short = id
+  def getID: LibraryID = id
   def getName: String = name
   def getPath: String = path
 

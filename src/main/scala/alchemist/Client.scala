@@ -4,7 +4,8 @@ import java.io.InputStream
 import java.net.Socket
 import java.util.{Arrays, Collections}
 
-class Client {
+@SerialVersionUID(12L)
+class Client extends Serializable {
 
   var hostname: String = _
   var address: String = _
@@ -20,8 +21,8 @@ class Client {
   var sock: Socket = _
   var in: InputStream = _
 
-  val writeMessage = new Message
-  val readMessage = new Message
+  var writeMessage = new Message
+  var readMessage = new Message
 
 
   def connect(idx: Int = -1): Boolean = {
@@ -34,7 +35,7 @@ class Client {
 
       sock = new Socket(address, port)
 
-      handshake
+      handshake._1
     }
     catch {
       case e: Exception => {
@@ -54,8 +55,17 @@ class Client {
     connect(-1)
   }
 
-  def sendMessage: this.type = {
+  def setBufferLength(bufferLength: Int = 10000000): this.type = {
 
+    writeMessage.setBufferLength(bufferLength)
+    readMessage.setBufferLength(bufferLength)
+
+    this
+  }
+
+  def sendMessage: (Long, Long) = {
+
+    val startTime = System.nanoTime
     val ar = writeMessage.finish
     Collections.reverse(Arrays.asList(ar))
 
@@ -64,12 +74,10 @@ class Client {
     sock.getOutputStream.write(ar)
     sock.getOutputStream.flush
 
-    receiveMessage
-
-    this
+    (writeMessage.headerLength + writeMessage.bodyLength, System.nanoTime - startTime)
   }
 
-  def receiveMessage: this.type = {
+  def receiveMessage: (Long, Long) = {
 
     val in = sock.getInputStream
 
@@ -77,6 +85,8 @@ class Client {
     val packet: Array[Byte] = Array.fill[Byte](8192)(0)
 
     in.read(header, 0, readMessage.headerLength)
+
+    val startTime = System.nanoTime
 
     readMessage.reset
       .addHeader(header)
@@ -93,15 +103,16 @@ class Client {
     readMessage.readHeader.resetPosition
 //    readMessage.print
 
-    this
+    (readMessage.headerLength + readMessage.bodyLength, System.nanoTime - startTime)
   }
 
-  def handshake: Boolean = {
+  def handshake: (Boolean, Overhead, Overhead) = {
 
-    val testArray: ArrayBlockDouble = new ArrayBlockDouble(
-      Array[Long](0l, 3l, 1l, 0l, 2l, 1l).grouped(3).toArray,
-      (for {r <- 3 to 14} yield 1.11*r).toArray
+    val testMatrix: MatrixBlock = new MatrixBlock(
+      (for {r <- 3 to 14} yield 1.11*r).toArray, Array[Long](0l, 3l, 1l), Array[Long](0l, 2l, 1l)
     )
+
+    val sendStartTime = System.nanoTime
 
     writeMessage.start(0, 0, Command.Handshake)
       .writeByte(2)
@@ -109,71 +120,124 @@ class Client {
       .writeString("ABCD")
       .writeDouble(1.11)
       .writeDouble(2.22)
-      .writeArrayBlockDouble(testArray)
+      .writeMatrixBlock(testMatrix)
 
-    sendMessage
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-    validateHandshake
-  }
+    val receiveStartTime = System.nanoTime
+    val (receiveBytes, receiveTime) = receiveMessage
 
-  def validateHandshake: Boolean = {
+    val validHandshake: Boolean = {
+      if (readMessage.readCommandCode == 1 && readMessage.readShort == 4321 &&
+        readMessage.readString == "DCBA" && readMessage.readDouble ==  3.33) {
+          clientID = readMessage.readClientID
+          sessionID = readMessage.readSessionID
 
-    if (readMessage.readCommandCode == 1 && readMessage.readShort == 4321 &&
-      readMessage.readString == "DCBA" && readMessage.readDouble ==  3.33) {
-      clientID = readMessage.readClientID
-      sessionID = readMessage.readSessionID
-
-      return true
+          true
+        }
+      else false
     }
 
-    false
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (validHandshake, sendOverhead, receiveOverhead)
   }
 
-  def requestClientID: this.type = {
+  def requestClientID: (Overhead, Overhead) = {
+
+    val sendStartTime = System.nanoTime
 
     writeMessage.start(clientID, sessionID, Command.RequestId)
 
-    sendMessage
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
+
+    val receiveStartTime = System.nanoTime
+    val (receiveBytes, receiveTime) = receiveMessage
 
     ID = readMessage.readClientID
 
-    this
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (sendOverhead, receiveOverhead)
   }
 
-  def clientInfo(numWorkers: Byte, logDir: String): this.type = {
+  def clientInfo(numWorkers: Byte, logDir: String): (Overhead, Overhead) = {
+
+    val sendStartTime = System.nanoTime
 
     writeMessage.start(clientID, sessionID, Command.ClientInfo)
       .writeShort(numWorkers)
       .writeString(logDir)
 
-    sendMessage
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-    this
+    val receiveStartTime = System.nanoTime
+    val (receiveBytes, receiveTime) = receiveMessage
+
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (sendOverhead, receiveOverhead)
   }
 
-  def sendTestString(testString: String): String = {
+  def sendTestString(testString: String): (String, Overhead, Overhead) = {
+
+    val sendStartTime = System.nanoTime
 
     writeMessage.start(clientID, sessionID, Command.SendTestString)
       .writeString(testString)
 
-    sendMessage
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-    readMessage.readString
+    val receiveStartTime = System.nanoTime
+    val (receiveBytes, receiveTime) = receiveMessage
+
+    val responseString: String = readMessage.readString
+
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (responseString, sendOverhead, receiveOverhead)
   }
 
-  def requestTestString: String = {
+  def requestTestString: (String, Overhead, Overhead) = {
+
+    val sendStartTime = System.nanoTime
 
     writeMessage.start(clientID, sessionID, Command.RequestTestString)
 
-    sendMessage
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-    readMessage.readString
+    val receiveStartTime = System.nanoTime
+    val (receiveBytes, receiveTime) = receiveMessage
+
+    val testString: String = readMessage.readString
+
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (testString, sendOverhead, receiveOverhead)
   }
 
-  def disconnectFromAlchemist: this.type = {
-    println(s"Disconnecting from Alchemist")
-    sock.close()
-    this
+  def close: (Overhead, Overhead) = disconnectFromAlchemist
+
+  def disconnectFromAlchemist: (Overhead, Overhead) = {
+
+    val sendStartTime = System.nanoTime
+
+    writeMessage.start(clientID, sessionID, Command.CloseConnection)
+
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
+
+    val receiveStartTime = System.nanoTime
+    val (receiveBytes, receiveTime) = receiveMessage
+
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (sendOverhead, receiveOverhead)
   }
 
 }

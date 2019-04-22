@@ -2,8 +2,12 @@ package alchemist
 
 import scala.collection.Map
 import scala.collection.immutable.Seq
-import scala.util.Random
+import scala.util.Sorting
 import java.io.{BufferedReader, FileInputStream, InputStreamReader, DataInputStream => JDataInputStream, DataOutputStream => JDataOutputStream}
+
+import alchemist.AlchemistSession.{checkIfConnected, printWorkers}
+import org.apache.spark.mllib.linalg.DenseVector
+import org.apache.spark.mllib.linalg.distributed.IndexedRowMatrix
 
 // spark-core
 import org.apache.spark.rdd.RDD
@@ -13,88 +17,54 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.mllib.linalg.distributed.{DistributedMatrix, IndexedRow, IndexedRowMatrix, RowMatrix}
 
 
-case class ArrayID(value: Short)
+case class MatrixID(value: Short) extends Serializable
+case class LibraryID(value: Byte) extends Serializable
 
 
 object AlchemistSession {
 
-  println("Starting Alchemist session")
+  var verbose = true
+  var showOverheads = false
+
+  if (verbose) println("Starting Alchemist session")
 
   var connected: Boolean = false
 
   val driver: DriverClient = new DriverClient()
   var workers: Map[Short, WorkerInfo] = Map.empty[Short, WorkerInfo]
+  var bufferLength: Int = 10000000
+
   var libraries: Map[Byte, LibraryHandle] = Map.empty[Byte, LibraryHandle]
 
   var spark: SparkSession = _
 
-  println("Alchemist session ready")
+  if (verbose) println("Alchemist session ready")
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = { }
 
-    //    initialize
-    //    connect("0.0.0.0", 24960)
-    //    if (connected) {
-    //      println("Connected to Alchemist")
-    //    } else {
-    //      println("Unable to connect to Alchemist")
-    //    }
+  def initialize(_spark: SparkSession,
+                 _bufferLength: Int = 10000000,
+                 _verbose: Boolean = true,
+                 _showOverheads: Boolean = false): this.type = {
 
-    //    requestWorkers(2)
-
-    //    stop
-  }
-
-  def initialize(_spark: SparkSession): this.type = {
     spark = _spark
+    bufferLength = _bufferLength
+    verbose = _verbose
+    showOverheads = _showOverheads
+
+    driver.setBufferLength(bufferLength)
 
     this
   }
 
-  def createRandomRDD(nRows: Int, nCols: Int, ss: SparkSession): RDD[Array[Array[Double]]] = {
-    val randomArray = Array.ofDim[Double](nRows, nCols)
-
-    val rnd = new Random(123)
-
-    for {
-      i <- 0 until 20
-      j <- 0 until 10
-    } randomArray(i)(j) = rnd.nextGaussian()
-
-    ss.sparkContext.parallelize(Seq(randomArray))
-  }
-
-  def loadLibrary(name: String, path: String, jar: String): LibraryHandle = {
-
-    println(s"Loading library $name at $path")
-    try {
-      val lh = driver.loadLibrary(name, path)
-      libraries = libraries + (lh.id -> lh)
-
-      println(s"Loaded library $name with ID ${lh.id}")
-
-      return lh
-    }
-    catch {
-      case e: LibraryNotFoundException => {
-        println(e.getMessage)
-        return LibraryHandle(0, "", "")
-      }
-    }
-
-    //    var classLoader = new java.net.URLClassLoader(
-    //      Array(new File(jar).toURI.toURL),
-    //      this.getClass.getClassLoader)
-    //
-    //    var c = classLoader.loadClass(s"${name.toLowerCase}.${name}")
-  }
+  // ------------------------------------------- Connection -------------------------------------------
 
   def connect(_address: String = "", _port: Int = 0): this.type = {
 
     var address = _address
     var port = _port
     if (address == "" || port == 0) {
-      println(s"Reading Alchemist address and port from file")
+      if (verbose) println(s"Reading Alchemist address and port from file")
       try {
         val fstream: FileInputStream = new FileInputStream("connection.info")
         // Get the object of DataInputStream
@@ -103,14 +73,14 @@ object AlchemistSession {
         address = br.readLine()
         port = Integer.parseInt(br.readLine)
 
-        in.close() //Close the input stream
+        in.close()                    // Close the input stream
       }
       catch {
-        case e: Exception => println("Got this unknown exception: " + e.getMessage)
+        case e: Exception => println("Got exception: " + e.getMessage)
       }
     }
 
-    println(s"Connecting to Alchemist at $address:$port")
+    if (verbose) println(s"Connecting to Alchemist at $address:$port")
     try {
       connected = driver.connect(address, port)
     }
@@ -121,221 +91,355 @@ object AlchemistSession {
     this
   }
 
-  def requestWorkers(numWorkers: Short): this.type = {
+  def checkIfConnected: Boolean = {
 
-    if (connected) {
-      if (numWorkers < 1)
-        println(s"Cannot request $numWorkers Alchemist workers")
-      else {
-        println(s"Requesting $numWorkers Alchemist workers")
-
-        workers = driver.requestWorkers(numWorkers)
-
-        if (workers.isEmpty)
-          println(s"Alchemist could not assign $numWorkers workers")
-        else {
-          println(s"Assigned $numWorkers workers:")
-          workers.foreach(w => println(s"    ${w.toString}"))
-        }
-      }
-    }
-
-    this
-  }
-
-  def yieldWorkers(): this.type = {
-
-    if (connected) driver.yieldWorkers()
-
-    this
-  }
-
-  def runTask(lib: LibraryHandle, name: String, inArgs: Parameters): Parameters = {
-
-    print(s"Alchemist started task '$name' ... ")
-    val outArgs: Parameters = driver.runTask(lib, name, inArgs)
-    println("done")
-
-    outArgs
-  }
-
-  def getArrayHandle(mat: DistributedMatrix, name: String = ""): ArrayHandle =
-    driver.sendArrayInfo(name, mat.numRows, mat.numCols)
-
-  def sendIndexedRowMatrix(mat: IndexedRowMatrix): ArrayHandle = {
-
-    val ah: ArrayHandle = getArrayHandle(mat)
-
-    val ahID: ArrayID = ah.id
-    val ahNumPartitions: Long = ah.numPartitions.toLong
-    val ahWorkerAssignments = ah.workerAssignments
-
-    mat.rows.mapPartitionsWithIndex { (idx, part) =>
-      val rows = part.toArray
-
-      var workerClients: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
-
-      var connectedWorkers: Int = 0
-      workers foreach (w => {
-        val wc: WorkerClient = new WorkerClient(w._2.ID, w._2.hostname, w._2.address, w._2.port)
-        workerClients += (w._1 -> wc)
-        if (wc.connect(idx)) connectedWorkers += 1
-      })
-
-      if (connectedWorkers == workerClients.size) {
-        println(s"Spark executor ${idx}: Connected to ${connectedWorkers} Alchemist workers")
-
-        workerClients foreach (w => {
-          w._2.startSendIndexedRows(ahID)
-        })
-
-        rows foreach (row => {
-          val default = (0.toShort, 0l)
-          val wID: Short = ahWorkerAssignments.find(_._2 == (row.index % ahNumPartitions)).getOrElse(default)._1
-          workerClients(wID).addIndexedRow(row)
-        })
-
-        workerClients foreach (w => {
-          val numRows: Long = w._2.finishSendIndexedRows
-
-          println(s"Spark executor ${idx}: Alchemist received $numRows rows for Array ${ahID.value}")
-        })
-      }
-
-      println(s"Spark executor ${idx}: Finished sending data")
-
-      part
-    }.count
-
-    println(s"Finished sending data")
-
-    ah
-  }
-
-  def getIndexedRowMatrix(ah: ArrayHandle): IndexedRowMatrix = {
-
-    val rowIndices: RDD[Long] = spark.sparkContext.parallelize(0l until ah.numRows)
-
-    val ahID: ArrayID = ah.id
-    val ahNumPartitions: Long = ah.numPartitions.toLong
-    val ahWorkerAssignments = ah.workerAssignments
-
-    new IndexedRowMatrix(
-      spark.sparkContext.union(
-        rowIndices.mapPartitionsWithIndex { (idx, part) => {
-          val rows = part.toArray
-
-          var workerClients: Map[Short, WorkerClient] = Map.empty[Short, WorkerClient]
-
-          var connectedWorkers: Int = 0
-          workers foreach (w => {
-            val wc: WorkerClient = new WorkerClient(w._2.ID, w._2.hostname, w._2.address, w._2.port)
-            workerClients += (w._1 -> wc)
-            if (wc.connect(idx)) connectedWorkers += 1
-          })
-
-          var requestedIndexedRows: Array[IndexedRow] = Array.empty[IndexedRow]
-
-          if (connectedWorkers == workerClients.size) {
-            println(s"Spark executor ${idx}: Connected to ${connectedWorkers} Alchemist workers")
-
-            workerClients foreach (w => {
-              w._2.startRequestIndexedRows(ahID)
-            })
-
-            rows foreach (row => {
-              val default = (0.toShort, 0l)
-              val wID: Short = ahWorkerAssignments.find(_._2 == (row % ahNumPartitions)).getOrElse(default)._1
-              workerClients(wID).requestIndexedRow(row)
-            })
-
-            workerClients foreach (w => {
-              val returnedRows: Array[IndexedRow] = w._2.finishRequestIndexedRows
-
-              var row_text: String = "row"
-              if (returnedRows.length > 1)
-                row_text += "s"
-              println(s"Spark executor ${idx}: Alchemist worker ${w._2.ID} returned ${returnedRows.length} ${row_text} for Array ${ahID.value}")
-              requestedIndexedRows = requestedIndexedRows ++ returnedRows
-            })
-
-            println(s"Spark executor ${idx}: Finished receiving data")
-          }
-
-          requestedIndexedRows.iterator
-        }
-        }))
-  }
-
-  def sendRowMatrix(mat: RowMatrix): ArrayHandle = getArrayHandle(mat)
-
-  def sendTestString: this.type = {
-    println("Sending test string to Alchemist")
-    driver.sendTestString("This is a test string from ACISpark")
-
-    this
-  }
-
-  def printIndexedRowMatrix(mat: IndexedRowMatrix): this.type = {
-
-    mat.rows.mapPartitionsWithIndex((idx, iterator) => iterator.map(v => (idx, v))).foreach(v => println(v))
-
-    this
-  }
-
-  def requestTestString: this.type = {
-    println("Requesting test string from Alchemist")
-    println(s"Received test string '${driver.requestTestString}'")
-
-    this
-  }
-
-  def yieldWorkers(yieldedWorkers: List[Byte] = List.empty[Byte]): this.type = {
-    val deallocatedWorkers: List[Byte] = driver.yieldWorkers(yieldedWorkers)
-
-    if (deallocatedWorkers.length == 0) {
-      println("No workers were deallocated\n")
-    }
+    if (connected) true
     else {
-      print("Deallocated workers ")
-      deallocatedWorkers.zipWithIndex.foreach {
-        case (w, i) => {
-          if (i < deallocatedWorkers.length) print(s"$w, ")
-          else print(s"and $w")
-        }
+      println("ERROR: Not connected to Alchemist")
+      false
+    }
+  }
+
+  def sendTestString(_testString: String = ""): this.type = {
+
+    if (checkIfConnected) {
+      val testString: String = {
+        if (_testString.isEmpty)
+          "This is a test string from a Spark application"
+        else _testString
       }
+
+      if (verbose) println(s"Sending the following test string to Alchemist: $testString")
+      val (responseString, sendOverhead, receiveOverhead): (String, Overhead, Overhead) = driver.sendTestString(testString)
+      if (verbose) println(s"Received the following response string from Alchemist: $responseString")
+
+      if (verbose && showOverheads) printOverheads("getMatrixHandle", sendOverhead, receiveOverhead)
     }
 
     this
   }
 
-  def listAlchemistWorkers: this.type = printWorkers(driver.listAllWorkers)
+  def disconnect: this.type = {
 
-  def listAllWorkers: this.type = printWorkers(driver.listAllWorkers)
-
-  def listInactiveWorkers: this.type = printWorkers(driver.listInactiveWorkers, "inactive ")
-
-  def listActiveWorkers: this.type = printWorkers(driver.listActiveWorkers, "active ")
-
-  def listAssignedWorkers: this.type = printWorkers(driver.listAssignedWorkers, "assigned ")
-
-  def printWorkers(workerList: Array[WorkerInfo], workerType: String = ""): this.type = {
-
-    workerList.length match {
-      case 0 => println(s"No ${workerType}workers")
-      case 1 => println(s"Listing 1 ${workerType}worker")
-      case _ => println(s"Listing ${workerList.length} ${workerType}workers")
-    }
-
-    workerList foreach { w => println(s"    ${w.toString(true)}") }
+    driver.close
 
     this
   }
 
   def stop: this.type = {
 
-    println("Ending Alchemist session")
-    driver.close
+    if (verbose) println("Ending Alchemist session")
+    disconnect
+  }
+
+  def setVerbose(_verbose: Boolean = true): this.type = {
+    verbose = _verbose
+
+    this
+  }
+
+  def setPrintOverheads(_showOverheads: Boolean = true): this.type = {
+    showOverheads = _showOverheads
+
+    this
+  }
+
+  def requestTestString: this.type = {
+    if (verbose) {
+      println("Requesting test string from Alchemist")
+      println(s"Received test string '${driver.requestTestString._1}'")
+    }
+
+    this
+  }
+
+  def requestWorkers(numWorkers: Short): this.type = {
+
+    if (checkIfConnected) {
+      if (numWorkers < 1)
+        println(s"Cannot request $numWorkers Alchemist workers")
+      else {
+        if (verbose) println(s"Requesting $numWorkers Alchemist workers")
+
+        val (_workers, sendOverhead, receiveOverhead) = driver.requestWorkers(numWorkers)
+
+        workers = _workers
+
+        if (verbose && showOverheads) printOverheads("requestWorkers", sendOverhead, receiveOverhead)
+
+        if (verbose) {
+          if (workers.isEmpty)
+            println(s"Alchemist could not assign $numWorkers workers")
+          else {
+            println(s"Assigned $numWorkers workers:")
+            workers.foreach(w => println(s"    ${w.toString}"))
+          }
+        }
+      }
+    }
+
+    this
+  }
+
+  // ----------------------------------------- Library Management -----------------------------------------
+
+
+  def loadLibrary(name: String, path: String, jar: String): LibraryHandle = {
+
+    if (checkIfConnected) {
+      if (verbose) println(s"Loading library $name at $path")
+      try {
+        val (lh, sendOverhead, receiveOverhead): (LibraryHandle, Overhead, Overhead) = driver.loadLibrary(name, path)
+        libraries = libraries + (lh.id.value -> lh)
+
+        if (verbose) println(s"Loaded library $name with ID ${lh.id.value}")
+
+        lh
+      }
+      catch {
+        case e: LibraryNotFoundException => {
+          println(e.getMessage)
+          new LibraryHandle
+        }
+      }
+    }
+    else new LibraryHandle
+  }
+
+  // --------------------------------------------------------------------------------------------------------
+
+  def runTask(lib: LibraryHandle, name: String, inArgs: Parameters): Parameters = {
+
+    if (checkIfConnected) {
+      if (verbose) print(s"Alchemist running task '$name' ... ")
+      val (outArgs, sendOverhead, receiveOverhead): (Parameters, Overhead, Overhead) = driver.runTask(lib, name, inArgs)
+      if (verbose) println("done")
+
+      if (verbose && showOverheads) printOverheads("runTask", sendOverhead, receiveOverhead)
+
+      outArgs
+    }
+    else new Parameters
+  }
+
+  def getMatrixHandle(mat: DistributedMatrix, name: String = ""): MatrixHandle = {
+
+    if (checkIfConnected) {
+      val (mh, sendOverhead, receiveOverhead): (MatrixHandle, Overhead, Overhead) = driver.sendMatrixInfo(name, mat.numRows, mat.numCols)
+
+      if (verbose && showOverheads) printOverheads("getMatrixHandle", sendOverhead, receiveOverhead)
+
+      mh
+    }
+    else new MatrixHandle
+  }
+
+  // --------------------------------------- IndexedRowMatrices ---------------------------------------
+
+  def sendIndexedRowMatrix(mat: IndexedRowMatrix): MatrixHandle = {
+
+    if (checkIfConnected) {
+      val mh: MatrixHandle = getMatrixHandle(mat)
+
+      mat.rows.mapPartitionsWithIndex { (idx, part) =>
+
+        val wc: WorkerClient = new WorkerClient
+        val indexedRows: Array[IndexedRow] = part.toArray
+        var sendOverheads: Array[Array[Overhead]] = Array.empty[Array[Overhead]]
+        var receiveOverheads: Array[Array[Overhead]] = Array.empty[Array[Overhead]]
+
+        if (verbose) Thread.sleep(idx * 100)
+
+        workers foreach (w => {
+          if (verbose) println(s"Spark executor ${idx}: Connecting to Alchemist worker ${w._2.ID} at ${w._2.address}:${w._2.port}")
+          if (wc.connect(w._2.ID, w._2.hostname, w._2.address, w._2.port)) {
+            if (verbose) println(s"Spark executor ${idx}: Connected to Alchemist worker ${w._2.ID} at ${w._2.address}:${w._2.port}, sending data ...")
+            val (workerSendOverheads, workerReceiveOverheads) = wc.sendIndexedRows(mh, indexedRows, idx)
+            sendOverheads = sendOverheads :+ workerSendOverheads
+            receiveOverheads = receiveOverheads :+ workerReceiveOverheads
+          }
+        })
+        if (verbose) println(s"Spark executor ${idx}: Finished sending data")
+
+        part
+      }.count
+
+      mh
+    }
+    else new MatrixHandle
+  }
+
+  def getIndexedRowMatrix(mh: MatrixHandle): IndexedRowMatrix = {
+
+    if (checkIfConnected) {
+      val rowIndices: RDD[Long] = spark.sparkContext.parallelize(0l until mh.numRows)
+      val times: Array[Long] = Array.fill[Long](4)(0)
+
+      val mat: IndexedRowMatrix = new IndexedRowMatrix(
+        spark.sparkContext.union(
+          rowIndices.mapPartitionsWithIndex { (idx, part) => {
+
+            val wc: WorkerClient = new WorkerClient
+            wc.setBufferLength(bufferLength)
+            val rowIndicesArray: Array[Long] = part.toArray
+            var requestedIndexedRows: Array[IndexedRow] = Array.empty[IndexedRow]
+
+            var sendOverheads: Array[Array[Overhead]] = Array.empty[Array[Overhead]]
+            var receiveOverheads: Array[Array[Overhead]] = Array.empty[Array[Overhead]]
+
+            var tempRows: scala.collection.mutable.Map[Int, Array[Double]] = scala.collection.mutable.Map.empty[Int, Array[Double]]
+            rowIndicesArray foreach (r => tempRows += (r.toInt -> Array.fill[Double](mh.numCols.toInt)(0.0)))
+
+            workers foreach (w => {
+              if (verbose) println(s"Spark executor ${idx}: Connecting to Alchemist worker ${w._2.ID} at ${w._2.address}:${w._2.port}")
+              if (wc.connect(w._2.ID, w._2.hostname, w._2.address, w._2.port)) {
+                if (verbose) println(s"Spark executor ${idx}: Connected to Alchemist worker ${w._2.ID} at ${w._2.address}:${w._2.port}, requesting data ...")
+                val (_tempRows, workerSendOverheads, workerReceiveOverheads) = wc.getIndexedRows(mh, rowIndicesArray, tempRows, idx)
+                tempRows = _tempRows
+                sendOverheads = sendOverheads :+ workerSendOverheads
+                receiveOverheads = receiveOverheads :+ workerReceiveOverheads
+              }
+            })
+
+            rowIndicesArray foreach (r => {
+              requestedIndexedRows = requestedIndexedRows :+ new IndexedRow(r.toInt, new DenseVector(tempRows(r.toInt)))
+            })
+
+            if (verbose) println(s"Spark executor ${idx}: Finished receiving data")
+            requestedIndexedRows.iterator
+          }
+          }))
+
+      mat
+    }
+    else new IndexedRowMatrix(spark.sparkContext.parallelize((0L to 2 - 1)
+      .map(x => IndexedRow(x, new DenseVector(Array.fill(2)(0.0))))))
+  }
+
+  def printIndexedRowMatrix(mat: IndexedRowMatrix): this.type = {
+
+    mat.rows.mapPartitionsWithIndex { (idx, part) => {
+      Thread.sleep(idx*100)
+      val indexedRows: Array[IndexedRow] = part.toArray
+
+      println(s"Partition $idx:")
+      indexedRows.foreach(r => println(r))
+
+      part
+    }}.count
+
+    this
+  }
+
+  // -------------------------------------------- Worker Management ----------------------------------------------
+
+  def yieldWorkers(yieldedWorkers: List[Byte] = List.empty[Byte]): this.type = {
+
+    if (checkIfConnected) {
+      val (deallocatedWorkers, sendOverhead, receiveOverhead) = driver.yieldWorkers(yieldedWorkers)
+
+      if (verbose) {
+        if (deallocatedWorkers.isEmpty)
+          println("No workers were deallocated\n")
+        else {
+          print("Deallocated workers ")
+          deallocatedWorkers.zipWithIndex.foreach {
+            case (w, i) => {
+              if (i < deallocatedWorkers.length) print(s"$w, ")
+              else print(s"and $w")
+            }
+          }
+        }
+      }
+
+      if (verbose && showOverheads) printOverheads("yieldWorkers", sendOverhead, receiveOverhead)
+    }
+
+    this
+  }
+
+  def listAlchemistWorkers: this.type = {
+
+    if (checkIfConnected) {
+      val (workerList, sendOverhead, receiveOverhead) = driver.listAllWorkers
+      printWorkers(workerList, "inactive ")
+
+      if (verbose && showOverheads) printOverheads("listAlchemistWorkers", sendOverhead, receiveOverhead)
+    }
+
+    this
+  }
+
+  def listAllWorkers: this.type = {
+
+    if (checkIfConnected) {
+      val (workerList, sendOverhead, receiveOverhead) = driver.listAllWorkers
+      printWorkers(workerList, "inactive ")
+
+      if (verbose && showOverheads) printOverheads("listAllWorkers", sendOverhead, receiveOverhead)
+    }
+
+    this
+  }
+
+  def listInactiveWorkers: this.type = {
+
+    if (checkIfConnected) {
+      val (workerList, sendOverhead, receiveOverhead) = driver.listInactiveWorkers
+      printWorkers(workerList, "inactive ")
+
+      if (verbose && showOverheads) printOverheads("listInactiveWorkers", sendOverhead, receiveOverhead)
+    }
+
+    this
+  }
+
+  def listActiveWorkers: this.type = {
+
+    if (checkIfConnected) {
+      val (workerList, sendOverhead, receiveOverhead) = driver.listActiveWorkers
+      printWorkers(workerList, "active ")
+
+      if (verbose && showOverheads) printOverheads("listActiveWorkers", sendOverhead, receiveOverhead)
+    }
+
+    this
+  }
+
+  def listAssignedWorkers: this.type = {
+
+    if (checkIfConnected) {
+      val (workerList, sendOverhead, receiveOverhead) = driver.listAssignedWorkers
+      printWorkers(workerList, "assigned ")
+
+      if (verbose && showOverheads) printOverheads("listAssignedWorkers", sendOverhead, receiveOverhead)
+    }
+
+    this
+  }
+
+  def printWorkers(workerList: Array[WorkerInfo], workerType: String = ""): this.type = {
+
+    if (verbose) {
+      workerList.length match {
+        case 0 => println(s"No ${workerType}workers")
+        case 1 => println(s"Listing 1 ${workerType}worker")
+        case _ => println(s"Listing ${workerList.length} ${workerType}workers")
+      }
+
+      workerList foreach { w => println(s"    ${w.toString(true)}") }
+    }
+
+    this
+  }
+
+  // ----------------------------------------- Utility functions -----------------------------------------
+
+  def printOverheads(methodName: String, sendOverhead: Overhead, receiveOverhead: Overhead): this.type = {
+
+    println(s"Overheads for method $methodName:")
+    println(sendOverhead.toString("    "))
+    println(receiveOverhead.toString("    "))
 
     this
   }

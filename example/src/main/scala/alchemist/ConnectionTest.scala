@@ -35,7 +35,7 @@ object ConnectionTest {
       .listInactiveWorkers
       .listActiveWorkers
       .listAssignedWorkers
-      .sendTestString
+      .sendTestString()
 
     val lh = als.loadLibrary("TestLib", "/Users/kai/Projects/AlLib/target/testlib.dylib", "libs/testlib-assembly-0.1.jar")
 
@@ -51,14 +51,16 @@ object ConnectionTest {
 
     val mat: IndexedRowMatrix = randomData(spark, 20, 5)
 
-    val matHandle = als.printIndexedRowMatrix(mat).sendIndexedRowMatrix(mat)
+    val matHandle = als.sendIndexedRowMatrix(mat)
 
     val matCopy: IndexedRowMatrix = als.getIndexedRowMatrix(matHandle)
 
-    println("Original IndexedRowMatrix:")
+    println("\nOriginal IndexedRowMatrix:")
+    println("--------------------------")
     als.printIndexedRowMatrix(mat)
 
-    println("IndexedRowMatrix returned from Alchemist:")
+    println("\nIndexedRowMatrix returned from Alchemist:")
+    println("-----------------------------------------")
     als.printIndexedRowMatrix(matCopy)
 
     spark.stop
@@ -74,7 +76,7 @@ object ConnectionTest {
     val startTime = System.nanoTime()
 
     val indexedRows: RDD[IndexedRow] = sc.parallelize((0L to numRows - 1)
-      .map(x => new IndexedRow(x, new DenseVector(Array.fill(numCols.toInt)(r.nextDouble())))))
+      .map(x => IndexedRow(x, new DenseVector(Array.fill(numCols.toInt)(r.nextDouble())))))
 
     val data = new IndexedRowMatrix(indexedRows)
 

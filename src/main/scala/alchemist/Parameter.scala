@@ -17,7 +17,8 @@ private[alchemist] case class Parameter[T](name: String, value: T) extends Param
         case d: Double => " (DOUBLE)"
         case c: Char => " (CHAR)"
         case a: String => " (STRING)"
-        case o: ArrayID => " (ARRAY ID)"
+        case o: MatrixID => " (MATRIX ID)"
+        case h: MatrixHandle => " (MATRIX INFO)"
       }
     }
     f"${name.concat(s"${datatype}:")}%-16s ${value}"
@@ -38,7 +39,8 @@ class Parameters {
         case Parameter(n: String, v: Double) => p.asInstanceOf[Parameter[Double]].toString(withType)
         case Parameter(n: String, v: Char) => p.asInstanceOf[Parameter[Char]].toString(withType)
         case Parameter(n: String, v: String) => p.asInstanceOf[Parameter[String]].toString(withType)
-        case Parameter(n: String, v: ArrayID) => p.asInstanceOf[Parameter[ArrayID]].toString(withType)
+        case Parameter(n: String, v: MatrixID) => p.asInstanceOf[Parameter[MatrixID]].toString(withType)
+        case Parameter(n: String, v: MatrixHandle) => p.asInstanceOf[Parameter[MatrixHandle]].toString(withType)
         case _ => "UNKNOWN PARAMETER"
       }}")
     }
@@ -60,6 +62,22 @@ class Parameters {
 
   def add[T](p: Parameter[T]): this.type = {
     ps = ps + (p.name -> p)
+    this
+  }
+
+  def add(p: ParameterValue): this.type = {
+    p match {
+      case Parameter(n: String, v: Byte) => ps = ps + (p.asInstanceOf[Parameter[Byte]].name -> p)
+      case Parameter(n: String, v: Short) => ps = ps + (p.asInstanceOf[Parameter[Short]].name -> p)
+      case Parameter(n: String, v: Int) => ps = ps + (p.asInstanceOf[Parameter[Int]].name -> p)
+      case Parameter(n: String, v: Long) => ps = ps + (p.asInstanceOf[Parameter[Long]].name -> p)
+      case Parameter(n: String, v: Float) => ps = ps + (p.asInstanceOf[Parameter[Float]].name -> p)
+      case Parameter(n: String, v: Double) => ps = ps + (p.asInstanceOf[Parameter[Double]].name -> p)
+      case Parameter(n: String, v: Char) => ps = ps + (p.asInstanceOf[Parameter[Char]].name -> p)
+      case Parameter(n: String, v: String) => ps = ps + (p.asInstanceOf[Parameter[String]].name -> p)
+      case Parameter(n: String, v: MatrixID) => ps = ps + (p.asInstanceOf[Parameter[MatrixID]].name -> p)
+      case _ => ps = ps + ("UNKNOWN TYPE" -> p)
+    }
     this
   }
 

@@ -4,81 +4,45 @@ import scala.collection.Map
 
 class DriverClient extends Client {          // Connects to the Alchemist driver
 
-  def runTask(lib: LibraryHandle, methodName: String, inArgs: Parameters): Parameters = {
+  def runTask(lib: LibraryHandle,
+              methodName: String,
+              inArgs: Parameters): (Parameters, Overhead, Overhead) = {
+
+    val sendStartTime = System.nanoTime
 
     writeMessage.start(clientID, sessionID, Command.RunTask)
     writeMessage.writeLibraryID(lib.id)
     writeMessage.writeString(methodName)
-    inArgs.getParameters.foreach { case (name, value) => serializeParameter(name, value) }
+    inArgs.getParameters.foreach { case (_, p) => writeMessage.writeParameter(p) }
 
-    sendMessage
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-    deserializeParameters
-  }
+    val (receiveBytes, receiveTime) = receiveMessage
+    val receiveStartTime = System.nanoTime
 
-  def deserializeParameters: Parameters = {
     val outArgs: Parameters = new Parameters
-    while (!readMessage.eom) {
-      var p = readMessage.readParameter
 
-      p match {
-        case Parameter(n: String, v: Byte) => outArgs.add(p.asInstanceOf[Parameter[Byte]])
-        case Parameter(n: String, v: Short) => outArgs.add(p.asInstanceOf[Parameter[Short]])
-        case Parameter(n: String, v: Int) => outArgs.add(p.asInstanceOf[Parameter[Int]])
-        case Parameter(n: String, v: Long) => outArgs.add(p.asInstanceOf[Parameter[Long]])
-        case Parameter(n: String, v: Float) => outArgs.add(p.asInstanceOf[Parameter[Float]])
-        case Parameter(n: String, v: Double) => outArgs.add(p.asInstanceOf[Parameter[Double]])
-        case Parameter(n: String, v: Char) => outArgs.add(p.asInstanceOf[Parameter[Char]])
-        case Parameter(n: String, v: String) => outArgs.add(p.asInstanceOf[Parameter[String]])
-        case Parameter(n: String, v: ArrayID) => outArgs.add(p.asInstanceOf[Parameter[ArrayID]])
-        case _ => "UNKNOWN TYPE"
-      }
-    }
+    while (!readMessage.eom)
+      outArgs.add(readMessage.readParameter)
 
-    outArgs
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (outArgs, sendOverhead, receiveOverhead)
   }
 
-  def serializeParameter(name: String, p: ParameterValue): Unit = {
-
-    writeMessage.writeParameter.writeString(name)
-    p match {
-      case Parameter(n: String, v: Byte) => writeMessage.writeByte(p.asInstanceOf[Parameter[Byte]].value)
-      case Parameter(n: String, v: Short) => writeMessage.writeShort(p.asInstanceOf[Parameter[Short]].value)
-      case Parameter(n: String, v: Int) => writeMessage.writeInt(p.asInstanceOf[Parameter[Int]].value)
-      case Parameter(n: String, v: Long) => writeMessage.writeLong(p.asInstanceOf[Parameter[Long]].value)
-      case Parameter(n: String, v: Float) => writeMessage.writeFloat(p.asInstanceOf[Parameter[Float]].value)
-      case Parameter(n: String, v: Double) => writeMessage.writeDouble(p.asInstanceOf[Parameter[Double]].value)
-      case Parameter(n: String, v: Char) => writeMessage.writeChar(p.asInstanceOf[Parameter[Char]].value)
-      case Parameter(n: String, v: String) => writeMessage.writeString(p.asInstanceOf[Parameter[String]].value)
-      case Parameter(n: String, v: ArrayID) => writeMessage.writeArrayID(p.asInstanceOf[Parameter[ArrayID]].value)
-      case _ => println("Unknown type")
-    }
-  }
-
-//  def deserializeParameter: Parameter = {
-//
-//    writeMessage.writeParameter.writeString(p.name)
-//    p.datatype.value match {
-//      case Datatype.Byte.value => writeMessage.writeByte(p.value)
-//      case Datatype.Short.value => writeMessage.writeShort(p.value)
-//      case Datatype.Int.value => writeMessage.writeInt(p.value)
-//      case Datatype.Long.value => writeMessage.writeLong(p.value)
-//      case Datatype.Float.value => writeMessage.writeFloat(p.value)
-//      case Datatype.Double.value => writeMessage.writeDouble(p.value)
-//      case Datatype.Char.value => writeMessage.writeChar(p.value)
-//      case Datatype.String.value => writeMessage.writeString(p.value)
-//      case Datatype.ArrayID.value => writeMessage.writeArrayID(p.value)
-//    }
-//  }
-
-
-
-  def requestWorkers(numWorkers: Short): Map[Short, WorkerInfo] = {
+  def requestWorkers(numWorkers: Short): (Map[Short, WorkerInfo], Overhead, Overhead) = {
 
     writeMessage.start(clientID, sessionID, Command.RequestWorkers)
                 .writeShort(numWorkers)
 
-    sendMessage
+    val sendStartTime = System.nanoTime
+
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
+
+    val (receiveBytes, receiveTime) = receiveMessage
+    val receiveStartTime = System.nanoTime
 
     val numAssignedWorkers: Short = readMessage.readShort
 
@@ -89,46 +53,54 @@ class DriverClient extends Client {          // Connects to the Alchemist driver
       workers += (w.ID -> w)
     })
 
-    workers
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (workers, sendOverhead, receiveOverhead)
   }
 
-  def yieldWorkers(yieldedWorkers: List[Byte] = List.empty[Byte]): List[Byte] = {
+  def yieldWorkers(yieldedWorkers: List[Byte] = List.empty[Byte]): (List[Byte], Overhead, Overhead) = {
 
-    println(s"Yielding Alchemist workers")
+    val sendStartTime = System.nanoTime
 
     writeMessage.start(clientID, sessionID, Command.YieldWorkers)
 
-    sendMessage
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-    yieldedWorkers
+    val (receiveBytes, receiveTime) = receiveMessage
+    val receiveStartTime = System.nanoTime
+
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (yieldedWorkers, sendOverhead, receiveOverhead)
   }
 
-  def sendArrayInfo(name: String, numRows: Long, numCols: Long, sparse: Byte = 0, layout: Byte = 0): ArrayHandle = {
+  def sendMatrixInfo(name: String,
+                     numRows: Long,
+                     numCols: Long,
+                     sparse: Byte = 0,
+                     layout: Layout = Layout.MC_MR): (MatrixHandle, Overhead, Overhead) = {
 
-    writeMessage.start(clientID, sessionID, Command.ArrayInfo)
+    val sendStartTime = System.nanoTime
+
+    writeMessage.start(clientID, sessionID, Command.MatrixInfo)
       .writeString(name)
       .writeLong(numRows)
       .writeLong(numCols)
       .writeByte(sparse)
-      .writeByte(layout)
+      .writeByte(layout.value)
 
-    sendMessage
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-    readMessage.readArrayInfo
-  }
+    val (receiveBytes, receiveTime) = receiveMessage
+    val receiveStartTime = System.nanoTime
 
-  def extractLayout: Array[Short] = {
+    val mh: MatrixHandle = readMessage.readMatrixInfo
 
-    val numRows: Long = readMessage.readLong
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
 
-    (0l until numRows).map(_ => readMessage.readShort).toArray
-  }
-
-  def sendAssignedWorkersInfo(preamble: String): this.type = {
-
-    writeMessage.start(clientID, sessionID, Command.SendAssignedWorkersInfo)
-
-    sendMessage
+    (mh, sendOverhead, receiveOverhead)
   }
 
   def readWorkerList: Array[WorkerInfo] = {
@@ -141,91 +113,118 @@ class DriverClient extends Client {          // Connects to the Alchemist driver
     workerList
   }
 
-  def listAllWorkers: Array[WorkerInfo] = {
+  def listAllWorkers: (Array[WorkerInfo], Overhead, Overhead) = {
+
+    val sendStartTime = System.nanoTime
 
     writeMessage.start(clientID, sessionID, Command.ListAllWorkers)
 
-    sendMessage
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-    readWorkerList
+    val (receiveBytes, receiveTime) = receiveMessage
+    val receiveStartTime = System.nanoTime
+
+    val workerList: Array[WorkerInfo] = readWorkerList
+
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (workerList, sendOverhead, receiveOverhead)
   }
 
-  def listActiveWorkers: Array[WorkerInfo] = {
+  def listActiveWorkers: (Array[WorkerInfo], Overhead, Overhead) = {
+
+    val sendStartTime = System.nanoTime
 
     writeMessage.start(clientID, sessionID, Command.ListActiveWorkers)
 
-    sendMessage
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-    readWorkerList
+    val (receiveBytes, receiveTime) = receiveMessage
+    val receiveStartTime = System.nanoTime
+
+    val workerList: Array[WorkerInfo] = readWorkerList
+
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (workerList, sendOverhead, receiveOverhead)
   }
 
-  def listInactiveWorkers: Array[WorkerInfo] = {
+  def listInactiveWorkers: (Array[WorkerInfo], Overhead, Overhead) = {
+
+    val sendStartTime = System.nanoTime
 
     writeMessage.start(clientID, sessionID, Command.ListInactiveWorkers)
 
-    sendMessage
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-    readWorkerList
+    val (receiveBytes, receiveTime) = receiveMessage
+    val receiveStartTime = System.nanoTime
+
+    val workerList: Array[WorkerInfo] = readWorkerList
+
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (workerList, sendOverhead, receiveOverhead)
   }
 
-  def listAssignedWorkers: Array[WorkerInfo] = {
+  def listAssignedWorkers: (Array[WorkerInfo], Overhead, Overhead) = {
+
+    val sendStartTime = System.nanoTime
 
     writeMessage.start(clientID, sessionID, Command.ListAssignedWorkers)
 
-    sendMessage
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-    readWorkerList
+    val (receiveBytes, receiveTime) = receiveMessage
+    val receiveStartTime = System.nanoTime
+
+    val workerList: Array[WorkerInfo] = readWorkerList
+
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (workerList, sendOverhead, receiveOverhead)
   }
 
-  def loadLibrary(name: String, path: String): LibraryHandle = {
+  def loadLibrary(name: String, path: String): (LibraryHandle, Overhead, Overhead) = {
 
     writeMessage.start(clientID, sessionID, Command.LoadLibrary)
                 .writeString(name)
                 .writeString(path)
 
-    sendMessage
+    val sendStartTime = System.nanoTime
 
-    LibraryHandle(readMessage.readLibraryID, name, path)
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
+
+    val (receiveBytes, receiveTime) = receiveMessage
+    val receiveStartTime = System.nanoTime
+
+    val lh: LibraryHandle = LibraryHandle(readMessage.readLibraryID, name, path)
+
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (lh, sendOverhead, receiveOverhead)
   }
 
-  def runTask(preamble: String): this.type = {
-
-    writeMessage.start(clientID, sessionID, Command.RunTask)
-
-    sendMessage
-  }
-
-  def unloadLibrary(preamble: String): this.type = {
+  def unloadLibrary(libID: LibraryID): (Overhead, Overhead) = {
 
     writeMessage.start(clientID, sessionID, Command.UnloadLibrary)
+                .writeLibraryID(libID)
 
-    sendMessage
+    val sendStartTime = System.nanoTime
+
+    val (sendBytes, sendTime) = sendMessage
+    val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
+
+    val (receiveBytes, receiveTime) = receiveMessage
+    val receiveStartTime = System.nanoTime
+
+    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+
+    (sendOverhead, receiveOverhead)
   }
-
-  def matrixInfo: this.type = {
-
-    writeMessage.start(clientID, sessionID, Command.ArrayInfo)
-
-    sendMessage
-  }
-
-  def matrixLayout: this.type = {
-
-    writeMessage.start(clientID, sessionID, Command.ArrayLayout)
-
-    sendMessage
-  }
-
-  def matrixBlock: this.type = {
-
-    writeMessage.start(clientID, sessionID, Command.RequestArrayBlocks) // TODO: Not sure which one this is.
-
-    sendMessage
-  }
-
-  def close: this.type = {
-//    yieldWorkers
-    disconnectFromAlchemist
-  }
-
 }
