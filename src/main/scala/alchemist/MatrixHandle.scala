@@ -37,11 +37,11 @@ class MatrixHandle(val id: MatrixID = MatrixID(0), val name: String = "", val nu
     if (layout == Layout.MC_MR.value)
       rows = Array(grid.array(ID)(0).toLong, numRows-1, grid.numRows.toLong)
     else if (layout == Layout.MR_MC.value)
-      cols = Array(grid.array(ID)(1).toLong, numRows-1, grid.numCols.toLong)
+      rows = Array(grid.array(ID)(1).toLong, numRows-1, grid.numCols.toLong)
     else if (layout == Layout.VC_STAR.value)
-      cols = Array(grid.array(ID)(1).toLong, numRows-1, (grid.numCols * grid.numRows).toLong)
+      rows = Array(grid.array(ID)(1).toLong, numRows-1, (grid.numCols * grid.numRows).toLong)
     else if (layout == Layout.VR_STAR.value)
-      cols = Array(grid.array(ID)(1).toLong, numRows-1, 1l)
+      rows = Array(grid.array(ID)(1).toLong, numRows-1, 1l)
 
     rows
   }
