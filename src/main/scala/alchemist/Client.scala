@@ -121,6 +121,7 @@ class Client extends Serializable {
       .writeDouble(1.11)
       .writeDouble(2.22)
       .writeMatrixBlock(testMatrix)
+      .writeInt(writeMessage.maxBodyLength + writeMessage.headerLength)
 
     val (sendBytes, sendTime) = sendMessage
     val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
