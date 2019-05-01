@@ -12,7 +12,7 @@ import org.apache.spark.mllib.linalg.{DenseVector, Matrices, Matrix, SingularVal
 
 object SVDTest {
 
-  def run(args: Array[String] = Array.empty[String]): Unit = {
+  def run(hostname: String, args: Array[String] = Array.empty[String]): Unit = {
     // Parse parameters from command line arguments
     val k: Int = if (args.length > 0) args(0).toInt else 20
     val infile: String = if (args.length > 1) args(1).toString else ""
@@ -52,7 +52,7 @@ object SVDTest {
     testSpark(spark, data, k)
 
     println("============================ Testing Alchemist ============================")
-    testAlchemist(spark, data, k)
+    testAlchemist(hostname, spark, data, k)
 
     spark.stop
   }
@@ -88,7 +88,7 @@ object SVDTest {
     println("Relative Error is " + relativeError.toString)
   }
 
-  def testAlchemist(spark: SparkSession, A: IndexedRowMatrix, k: Int): Unit = {
+  def testAlchemist(hostname: String, spark: SparkSession, A: IndexedRowMatrix, k: Int): Unit = {
 
     val sc = spark.sparkContext
     // Compute the squared Frobenius norm
@@ -98,7 +98,7 @@ object SVDTest {
 
     // Launch Alchemist
     var startTime = System.nanoTime()
-    val als = AlchemistSession.initialize(spark).connect("0.0.0.0", 24960).requestWorkers(2)
+    val als = AlchemistSession.initialize(spark).connect(hostname, 24960).requestWorkers(2)
     println(s"Time cost of starting Alchemist session: ${(System.nanoTime() - startTime) * 1.0E-9}")
     println(" ")
 //

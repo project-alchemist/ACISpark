@@ -12,7 +12,7 @@ import scala.collection.Map
 
 object ConnectionTest {
 
-  def run(args: Array[String] = Array.empty[String]): Unit = {
+  def run(hostname: String, args: Array[String] = Array.empty[String]): Unit = {
 
     Logger.getLogger("org").setLevel(Level.OFF)
     val spark = SparkSession
