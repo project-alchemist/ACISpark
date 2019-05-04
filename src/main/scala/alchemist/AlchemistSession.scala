@@ -59,11 +59,11 @@ object AlchemistSession {
 
   // ------------------------------------------- Connection -------------------------------------------
 
-  def connect(_address: String = "", _port: Int = 0): this.type = {
+  def connect(_hostname: String = "", _port: Int = 0): this.type = {
 
-    var address = _address
+    var hostname = _hostname
     var port = _port
-    if (address == "" || port == 0) {
+    if (hostname == "" || port == 0) {
       if (verbose) println(s"Reading Alchemist address and port from file")
       try {
         val fstream: FileInputStream = new FileInputStream("connection.info")
@@ -79,10 +79,12 @@ object AlchemistSession {
         case e: Exception => println("Got exception: " + e.getMessage)
       }
     }
+    if (hostname == "0.0.0.0")
+      hostname = "localhost"
 
-    if (verbose) println(s"Connecting to Alchemist at $address:$port")
+    if (verbose) println(s"Connecting to Alchemist at $hostname:$port")
     try {
-      connected = driver.connect(address, port)
+      connected = driver.connect(hostname, port)
     }
     catch {
       case e: InvalidHandshakeException => println(e.getMessage)

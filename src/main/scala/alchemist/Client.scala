@@ -29,9 +29,9 @@ class Client extends Serializable {
 
     try {
       if (idx < 0)
-        println(s"Connecting to Alchemist at $address:$port")
+        println(s"Connecting to Alchemist at $hostname:$port")
       else
-        println(s"Spark executor ${idx}: Connecting to Alchemist at $address:$port")
+        println(s"Spark executor ${idx}: Connecting to Alchemist at $hostname:$port")
 
       sock = new Socket(address, port)
 
@@ -47,9 +47,9 @@ class Client extends Serializable {
     }
   }
 
-  def connect(_address: String, _port: Int): Boolean = {
+  def connect(_hostname: String, _port: Int): Boolean = {
 
-    address = _address
+    hostname = _hostname
     port = _port
 
     connect(-1)

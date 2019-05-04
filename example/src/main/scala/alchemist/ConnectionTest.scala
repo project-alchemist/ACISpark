@@ -12,7 +12,7 @@ import scala.collection.Map
 
 object ConnectionTest {
 
-  def run(hostname: String, args: Array[String] = Array.empty[String]): Unit = {
+  def run(hostname: String="localhost", args: Array[String] = Array.empty[String]): Unit = {
 
     Logger.getLogger("org").setLevel(Level.OFF)
     val spark = SparkSession
@@ -22,7 +22,7 @@ object ConnectionTest {
     val startTime = System.nanoTime()
     val als = AlchemistSession
           .initialize(spark)
-          .connect("0.0.0.0", 24960)
+          .connect(hostname, 24960)
     println(s"Time cost of starting Alchemist session: ${(System.nanoTime() - startTime) * 1.0E-9}")
     println(" ")
 
