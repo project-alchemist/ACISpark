@@ -70,7 +70,7 @@ object AlchemistSession {
         // Get the object of DataInputStream
         val in: JDataInputStream = new JDataInputStream(fstream)
         val br: BufferedReader = new BufferedReader(new InputStreamReader(in))
-        address = br.readLine()
+        hostname = br.readLine()
         port = Integer.parseInt(br.readLine)
 
         in.close()                    // Close the input stream
