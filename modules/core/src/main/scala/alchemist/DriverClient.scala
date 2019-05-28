@@ -74,11 +74,11 @@ class DriverClient extends Client { // Connects to the Alchemist driver
   }
 
   def sendMatrixInfo(
-      name: String,
-      numRows: Long,
-      numCols: Long,
-      sparse: Byte = 0,
-      layout: Layout = Layout.MC_MR
+    name: String,
+    numRows: Long,
+    numCols: Long,
+    sparse: Byte = 0,
+    layout: Layout = Layout.MC_MR
   ): (MatrixHandle, Overhead, Overhead) = {
 
     val sendStartTime = System.nanoTime

@@ -5,8 +5,8 @@ import org.apache.spark.rdd._
 // spark-sql
 import org.apache.spark.sql.SparkSession
 // spark-mllib
-import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix, RowMatrix}
-import org.apache.spark.mllib.linalg.{DenseVector, Matrices, Matrix, SingularValueDecomposition, Vector, Vectors}
+import org.apache.spark.mllib.linalg.distributed.{ IndexedRow, IndexedRowMatrix, RowMatrix }
+import org.apache.spark.mllib.linalg.{ DenseVector, Matrices, Matrix, SingularValueDecomposition, Vector, Vectors }
 
 //import alchemist.{AlchemistSession, MatrixHandle}
 

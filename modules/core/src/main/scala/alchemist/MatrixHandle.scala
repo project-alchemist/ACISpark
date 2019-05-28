@@ -1,23 +1,25 @@
 package alchemist
 
-import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix}
+import org.apache.spark.mllib.linalg.distributed.{ IndexedRow, IndexedRowMatrix }
 import scala.math.max
 import org.apache.spark.sql.SparkSession
+
 @SerialVersionUID(16L)
 class ProcessGrid(
-    val numRows: Short = 0,
-    val numCols: Short = 0,
-    val array: Map[Short, Array[Short]] = Map.empty[Short, Array[Short]]
+  val numRows: Short = 0,
+  val numCols: Short = 0,
+  val array: Map[Short, Array[Short]] = Map.empty[Short, Array[Short]]
 ) extends Serializable
+
 @SerialVersionUID(15L)
 class MatrixHandle(
-    val id: MatrixID = MatrixID(0),
-    val name: String = "",
-    val numRows: Long = 0,
-    val numCols: Long = 0,
-    val sparse: Byte = 0,
-    val layout: Byte = Layout.MC_MR.value,
-    val grid: ProcessGrid = new ProcessGrid
+  val id: MatrixID = MatrixID(0),
+  val name: String = "",
+  val numRows: Long = 0,
+  val numCols: Long = 0,
+  val sparse: Byte = 0,
+  val layout: Byte = Layout.MC_MR.value,
+  val grid: ProcessGrid = new ProcessGrid
 ) extends Serializable {
 
   def getID: MatrixID = id

@@ -2,9 +2,9 @@ package alchemist
 
 @SerialVersionUID(13L)
 class MatrixBlock(
-    val data: Array[Double] = Array.empty[Double],
-    val rows: Array[Long] = Array(0L, 0L, 1L),
-    val cols: Array[Long] = Array(0L, 0L, 1L)
+  val data: Array[Double] = Array.empty[Double],
+  val rows: Array[Long] = Array(0L, 0L, 1L),
+  val cols: Array[Long] = Array(0L, 0L, 1L)
 ) {
 
   def toString(space: String = ""): String = {

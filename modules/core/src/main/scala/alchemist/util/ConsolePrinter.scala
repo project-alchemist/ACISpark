@@ -61,6 +61,7 @@ class ConsolePrinter(consoleColorChoice: String) {
 }
 
 object ConsolePrinter {
+
   def apply(consoleColorChoice: String) = {
     new ConsolePrinter(consoleColorChoice)
   }

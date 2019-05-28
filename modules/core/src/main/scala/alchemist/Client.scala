@@ -2,7 +2,7 @@ package alchemist
 
 import java.io.InputStream
 import java.net.Socket
-import java.util.{Arrays, Collections}
+import java.util.{ Arrays, Collections }
 
 @SerialVersionUID(12L)
 class Client extends Serializable {

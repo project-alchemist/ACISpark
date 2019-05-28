@@ -1,6 +1,6 @@
 package alchemist
 
-import enumeratum.values.{ByteEnum, ByteEnumEntry}
+import enumeratum.values.{ ByteEnum, ByteEnumEntry }
 import enumeratum.EnumEntry.UpperSnakecase
 
 private[alchemist] sealed abstract class Layout(override val value: Byte, val label: String)

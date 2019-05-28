@@ -1,8 +1,8 @@
 package alchemist.io
 
 import scala.collection.JavaConverters._
-import java.io.{PrintWriter, FileOutputStream, OutputStream, IOException, DataOutputStream => JDataOutputStream}
-import java.nio.{DoubleBuffer, ByteBuffer}
+import java.io.{ PrintWriter, FileOutputStream, OutputStream, IOException, DataOutputStream => JDataOutputStream }
+import java.nio.{ DoubleBuffer, ByteBuffer }
 import scala.io.Source
 import java.nio.charset.StandardCharsets
 

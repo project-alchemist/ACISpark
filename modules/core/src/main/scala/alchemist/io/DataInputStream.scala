@@ -2,12 +2,13 @@ package alchemist.io
 
 import scala.collection.JavaConverters._
 import scala.util.Random
-import java.io.{InputStream, DataInputStream => JDataInputStream}
-import java.nio.{DoubleBuffer, ByteBuffer}
+import java.io.{ InputStream, DataInputStream => JDataInputStream }
+import java.nio.{ DoubleBuffer, ByteBuffer }
 import java.nio.charset.StandardCharsets
 import scala.compat.Platform.EOL
 
 class DataInputStream(istream: InputStream) extends JDataInputStream(istream) {
+
   def readArrayLength(): Int = {
     val result = readLong()
     assert(result.toInt == result)

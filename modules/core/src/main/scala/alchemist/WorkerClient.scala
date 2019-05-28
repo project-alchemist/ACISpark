@@ -37,9 +37,9 @@ class WorkerClient() extends Client with Serializable {
   }
 
   def sendIndexedRows(
-      mh: MatrixHandle,
-      indexedRows: Array[IndexedRow],
-      idx: Int
+    mh: MatrixHandle,
+    indexedRows: Array[IndexedRow],
+    idx: Int
   ): (Array[Overhead], Array[Overhead]) = {
 
     val times: Array[Long] = Array.fill[Long](4)(0)
@@ -118,10 +118,10 @@ class WorkerClient() extends Client with Serializable {
   }
 
   def getIndexedRows(
-      mh: MatrixHandle,
-      rowIndices: Array[Long],
-      tempRows: scala.collection.mutable.Map[Int, Array[Double]],
-      idx: Int
+    mh: MatrixHandle,
+    rowIndices: Array[Long],
+    tempRows: scala.collection.mutable.Map[Int, Array[Double]],
+    idx: Int
   ): (scala.collection.mutable.Map[Int, Array[Double]], Array[Overhead], Array[Overhead]) = {
 
     val rows: Array[Long] = mh.getRowAssignments(ID)

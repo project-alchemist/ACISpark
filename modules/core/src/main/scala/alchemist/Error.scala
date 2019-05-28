@@ -2,7 +2,7 @@ package alchemist
 
 import alchemist.Command.findValues
 import enumeratum.EnumEntry.UpperSnakecase
-import enumeratum.values.{ByteEnum, ByteEnumEntry}
+import enumeratum.values.{ ByteEnum, ByteEnumEntry }
 
 private[alchemist] sealed abstract class Error(override val value: Byte, val label: String)
     extends ByteEnumEntry

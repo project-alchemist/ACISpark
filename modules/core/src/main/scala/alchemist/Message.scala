@@ -1,7 +1,7 @@
 package alchemist
 
 import scala.reflect.ClassTag
-import java.nio.{Buffer, ByteBuffer, ByteOrder}
+import java.nio.{ Buffer, ByteBuffer, ByteOrder }
 import java.nio.charset.StandardCharsets
 
 import org.apache.spark.mllib.linalg.DenseVector

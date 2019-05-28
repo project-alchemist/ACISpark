@@ -22,7 +22,7 @@ package alchemist
 //case object MatrixInfo extends Datatype(52, "MATRIX INFO")
 //case object DistMatrix extends Datatype(53, "DIST MATRIX")
 
-import enumeratum.values.{ByteEnum, ByteEnumEntry}
+import enumeratum.values.{ ByteEnum, ByteEnumEntry }
 import enumeratum.EnumEntry.UpperSnakecase
 
 private[alchemist] sealed abstract class Datatype(override val value: Byte, val label: String)

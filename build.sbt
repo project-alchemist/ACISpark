@@ -58,5 +58,5 @@ lazy val `alchemist-example` = (project in file("modules/example"))
   .dependsOn(`alchemist-core`)
 
 lazy val alchemist = (project in file("."))
-  .disablePlugins(AssemblyPlugin, ScalafmtPlugin)
+  .disablePlugins(AssemblyPlugin)
   .aggregate(`alchemist-core`, `alchemist-example`)

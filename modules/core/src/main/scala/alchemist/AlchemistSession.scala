@@ -11,7 +11,7 @@ import java.io.{
   DataOutputStream => JDataOutputStream
 }
 
-import alchemist.AlchemistSession.{checkIfConnected, printWorkers}
+import alchemist.AlchemistSession.{ checkIfConnected, printWorkers }
 import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.linalg.distributed.IndexedRowMatrix
 
@@ -20,7 +20,7 @@ import org.apache.spark.rdd.RDD
 // spark-sql
 import org.apache.spark.sql.SparkSession
 // spark-mllib
-import org.apache.spark.mllib.linalg.distributed.{DistributedMatrix, IndexedRow, IndexedRowMatrix, RowMatrix}
+import org.apache.spark.mllib.linalg.distributed.{ DistributedMatrix, IndexedRow, IndexedRowMatrix, RowMatrix }
 
 case class MatrixID(value: Short) extends Serializable
 case class LibraryID(value: Byte) extends Serializable
@@ -47,10 +47,10 @@ object AlchemistSession {
   def main(args: Array[String]): Unit = {}
 
   def initialize(
-      _spark: SparkSession,
-      _bufferLength: Int = 10000000,
-      _verbose: Boolean = true,
-      _showOverheads: Boolean = false
+    _spark: SparkSession,
+    _bufferLength: Int = 10000000,
+    _verbose: Boolean = true,
+    _showOverheads: Boolean = false
   ): this.type = {
 
     spark = _spark

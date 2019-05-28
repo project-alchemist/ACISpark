@@ -2,9 +2,9 @@ package alchemist
 
 //import alchemist.{AlchemistSession}
 //import alchemist.AlchemistSession.driver
-import org.apache.log4j.{Level, Logger}
+import org.apache.log4j.{ Level, Logger }
 import org.apache.spark.mllib.linalg.DenseVector
-import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix}
+import org.apache.spark.mllib.linalg.distributed.{ IndexedRow, IndexedRowMatrix }
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
