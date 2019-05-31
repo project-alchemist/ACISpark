@@ -16,7 +16,7 @@ class WorkerClient() extends Client with Serializable {
     port = _port
 
     try {
-      sock = new Socket(address, port)
+      sock = new Socket(hostname, port)
 
       handshake._1
     }
@@ -51,6 +51,8 @@ class WorkerClient() extends Client with Serializable {
 
     val numElements: Long = numRows * numCols
     val numMessages: Short = math.ceil((numElements * 8.0) / writeMessage.maxBodyLength).toShort
+
+    println(s"NUM MESSAGES $numMessages")
 
     val numRowsPerMessage: Long = math.ceil(numRows / numMessages).toLong
     var numSentElements: Long = 0l

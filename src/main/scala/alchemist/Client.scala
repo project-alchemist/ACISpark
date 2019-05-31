@@ -33,7 +33,7 @@ class Client extends Serializable {
       else
         println(s"Spark executor ${idx}: Connecting to Alchemist at $hostname:$port")
 
-      sock = new Socket(address, port)
+      sock = new Socket(hostname, port)
 
       handshake._1
     }

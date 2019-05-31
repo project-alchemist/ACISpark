@@ -52,6 +52,9 @@ object AlchemistSession {
     verbose = _verbose
     showOverheads = _showOverheads
 
+    print(s"Message buffer length set to $bufferLength")
+    print(s"Verbose set to $verbose")
+
     driver.setBufferLength(bufferLength)
 
     this
@@ -70,7 +73,7 @@ object AlchemistSession {
         // Get the object of DataInputStream
         val in: JDataInputStream = new JDataInputStream(fstream)
         val br: BufferedReader = new BufferedReader(new InputStreamReader(in))
-        address = br.readLine()
+        hostname = br.readLine()
         port = Integer.parseInt(br.readLine)
 
         in.close()                    // Close the input stream
@@ -243,25 +246,28 @@ object AlchemistSession {
     if (checkIfConnected) {
       val mh: MatrixHandle = getMatrixHandle(mat)
 
+      val numPartitions = mat.rows.getNumPartitions
+
       mat.rows.mapPartitionsWithIndex { (idx, part) =>
 
         val wc: WorkerClient = new WorkerClient
         val indexedRows: Array[IndexedRow] = part.toArray
+
         var sendOverheads: Array[Array[Overhead]] = Array.empty[Array[Overhead]]
         var receiveOverheads: Array[Array[Overhead]] = Array.empty[Array[Overhead]]
 
-        if (verbose) Thread.sleep(idx * 100)
+//        if (verbose) Thread.sleep(idx * 20)
 
         workers foreach (w => {
-          if (verbose) println(s"Spark executor ${idx}: Connecting to Alchemist worker ${w._2.ID} at ${w._2.address}:${w._2.port}")
+//          if (verbose) println(s"Partition $idx/$numPartitions: Connecting to Alchemist worker ${w._2.ID} at ${w._2.hostname}:${w._2.port}")
           if (wc.connect(w._2.ID, w._2.hostname, w._2.address, w._2.port)) {
-            if (verbose) println(s"Spark executor ${idx}: Connected to Alchemist worker ${w._2.ID} at ${w._2.address}:${w._2.port}, sending data ...")
+//            if (verbose) println(s"Partition $idx/$numPartitions: Connected to Alchemist worker ${w._2.ID} at ${w._2.hostname}:${w._2.port}, sending data ...")
             val (workerSendOverheads, workerReceiveOverheads) = wc.sendIndexedRows(mh, indexedRows, idx)
             sendOverheads = sendOverheads :+ workerSendOverheads
             receiveOverheads = receiveOverheads :+ workerReceiveOverheads
           }
         })
-        if (verbose) println(s"Spark executor ${idx}: Finished sending data")
+//        if (verbose) println(s"Partition $idx/$numPartitions: Finished sending data")
 
         part
       }.count
@@ -293,9 +299,9 @@ object AlchemistSession {
             rowIndicesArray foreach (r => tempRows += (r.toInt -> Array.fill[Double](mh.numCols.toInt)(0.0)))
 
             workers foreach (w => {
-              if (verbose) println(s"Spark executor ${idx}: Connecting to Alchemist worker ${w._2.ID} at ${w._2.address}:${w._2.port}")
+//              if (verbose) println(s"Spark executor ${idx}: Connecting to Alchemist worker ${w._2.ID} at ${w._2.hostname}:${w._2.port}")
               if (wc.connect(w._2.ID, w._2.hostname, w._2.address, w._2.port)) {
-                if (verbose) println(s"Spark executor ${idx}: Connected to Alchemist worker ${w._2.ID} at ${w._2.address}:${w._2.port}, requesting data ...")
+//                if (verbose) println(s"Spark executor ${idx}: Connected to Alchemist worker ${w._2.ID} at ${w._2.hostname}:${w._2.port}, requesting data ...")
                 val (_tempRows, workerSendOverheads, workerReceiveOverheads) = wc.getIndexedRows(mh, rowIndicesArray, tempRows, idx)
                 tempRows = _tempRows
                 sendOverheads = sendOverheads :+ workerSendOverheads
@@ -307,7 +313,7 @@ object AlchemistSession {
               requestedIndexedRows = requestedIndexedRows :+ new IndexedRow(r.toInt, new DenseVector(tempRows(r.toInt)))
             })
 
-            if (verbose) println(s"Spark executor ${idx}: Finished receiving data")
+//            if (verbose) println(s"Spark executor ${idx}: Finished receiving data")
             requestedIndexedRows.iterator
           }
           }))
@@ -321,7 +327,7 @@ object AlchemistSession {
   def printIndexedRowMatrix(mat: IndexedRowMatrix): this.type = {
 
     mat.rows.mapPartitionsWithIndex { (idx, part) => {
-      Thread.sleep(idx*100)
+      Thread.sleep(idx*20)
       val indexedRows: Array[IndexedRow] = part.toArray
 
       println(s"Partition $idx:")
