@@ -62,7 +62,7 @@ class MatrixHandle(val id: MatrixID = MatrixID(0), val name: String = "", val nu
     cols
   }
 
-  def getIndexedRowMatrix: IndexedRowMatrix = AlchemistSession.getIndexedRowMatrix(this)
+  def getIndexedRowMatrix: Option[IndexedRowMatrix] = AlchemistSession.getIndexedRowMatrix(this)
 
   def toString(space: String = ""): String = {
 

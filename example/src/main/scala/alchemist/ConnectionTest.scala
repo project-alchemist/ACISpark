@@ -56,21 +56,26 @@ object ConnectionTest {
 
     val mat: IndexedRowMatrix = randomData(spark, 20, 5)
 
-    val matHandle = als.sendIndexedRowMatrix(mat)
+    als.sendIndexedRowMatrix(mat) match {
+      case Some(mh) => {
+        als.getIndexedRowMatrix(mh) match {
+          case Some(matCopy) => {
+            println("\nOriginal IndexedRowMatrix:")
+            println("--------------------------")
+            als.printIndexedRowMatrix(mat)
 
-    val matCopy: IndexedRowMatrix = als.getIndexedRowMatrix(matHandle)
+            println("\nIndexedRowMatrix returned from Alchemist:")
+            println("-----------------------------------------")
+            als.printIndexedRowMatrix(matCopy)
+          }
+          case None => println("\nUnable to retrieve copy of 'mat' from Alchemist")
+        }
+      }
+      case None => println("\nUnable to send 'mat' to Alchemist")
+    }
 
-    println("\nOriginal IndexedRowMatrix:")
-    println("--------------------------")
-    als.printIndexedRowMatrix(mat)
-
-    println("\nIndexedRowMatrix returned from Alchemist:")
-    println("-----------------------------------------")
-    als.printIndexedRowMatrix(matCopy)
-
-    spark.stop
     als.stop
-
+    spark.stop
   }
 
   def randomData(spark: SparkSession, numRows: Long, numCols: Long): IndexedRowMatrix = {

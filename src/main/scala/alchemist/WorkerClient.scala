@@ -1,12 +1,13 @@
 package alchemist
 
 import java.net.Socket
+import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.linalg.distributed.IndexedRow
 
 @SerialVersionUID(14L)
-class WorkerClient() extends Client with Serializable {
+class WorkerClient extends Client with Serializable {
 
   def connect(_ID: Short, _hostname: String, _address: String, _port: Short): Boolean = {
 
@@ -51,8 +52,6 @@ class WorkerClient() extends Client with Serializable {
 
     val numElements: Long = numRows * numCols
     val numMessages: Short = math.ceil((numElements * 8.0) / writeMessage.maxBodyLength).toShort
-
-    println(s"NUM MESSAGES $numMessages")
 
     val numRowsPerMessage: Long = math.ceil(numRows / numMessages).toLong
     var numSentElements: Long = 0l

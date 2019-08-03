@@ -32,7 +32,8 @@ object AlchemistSession {
 
   val driver: DriverClient = new DriverClient()
   var workers: Map[Short, WorkerInfo] = Map.empty[Short, WorkerInfo]
-  var bufferLength: Int = 10000000
+  var driverBufferLength: Int = 0
+  var workerBufferLength: Int = 0
 
   var libraries: Map[Byte, LibraryHandle] = Map.empty[Byte, LibraryHandle]
 
@@ -43,19 +44,22 @@ object AlchemistSession {
   def main(args: Array[String]): Unit = { }
 
   def initialize(_spark: SparkSession,
-                 _bufferLength: Int = 10000000,
+                 _driverBufferLength: Int = 10000,
+                 _workerBufferLength: Int = 10000000,
                  _verbose: Boolean = true,
                  _showOverheads: Boolean = false): this.type = {
 
     spark = _spark
-    bufferLength = _bufferLength
+    driverBufferLength = _driverBufferLength
+    workerBufferLength = _workerBufferLength
     verbose = _verbose
     showOverheads = _showOverheads
 
-    print(s"Message buffer length set to $bufferLength")
+    print(s"Driver message buffer length set to $driverBufferLength")
+    print(s"Worker message buffer length set to $workerBufferLength")
     print(s"Verbose set to $verbose")
 
-    driver.setBufferLength(bufferLength)
+    driver.setBufferLength(driverBufferLength)
 
     this
   }
@@ -241,7 +245,7 @@ object AlchemistSession {
 
   // --------------------------------------- IndexedRowMatrices ---------------------------------------
 
-  def sendIndexedRowMatrix(mat: IndexedRowMatrix): MatrixHandle = {
+  def sendIndexedRowMatrix(mat: IndexedRowMatrix): Option[MatrixHandle] = {
 
     if (checkIfConnected) {
       val mh: MatrixHandle = getMatrixHandle(mat)
@@ -251,6 +255,7 @@ object AlchemistSession {
       mat.rows.mapPartitionsWithIndex { (idx, part) =>
 
         val wc: WorkerClient = new WorkerClient
+        wc.setBufferLength(workerBufferLength)
         val indexedRows: Array[IndexedRow] = part.toArray
 
         var sendOverheads: Array[Array[Overhead]] = Array.empty[Array[Overhead]]
@@ -272,25 +277,24 @@ object AlchemistSession {
         part
       }.count
 
-      mh
+      Some(mh)
     }
-    else new MatrixHandle
+    else None
   }
 
-  def getIndexedRowMatrix(mh: MatrixHandle): IndexedRowMatrix = {
+  def getIndexedRowMatrix(mh: MatrixHandle): Option[IndexedRowMatrix] = {
 
     if (checkIfConnected) {
       val rowIndices: RDD[Long] = spark.sparkContext.parallelize(0l until mh.numRows)
-      val times: Array[Long] = Array.fill[Long](4)(0)
 
       val mat: IndexedRowMatrix = new IndexedRowMatrix(
         spark.sparkContext.union(
           rowIndices.mapPartitionsWithIndex { (idx, part) => {
 
             val wc: WorkerClient = new WorkerClient
-            wc.setBufferLength(bufferLength)
+            wc.setBufferLength(workerBufferLength)
             val rowIndicesArray: Array[Long] = part.toArray
-            var requestedIndexedRows: Array[IndexedRow] = Array.empty[IndexedRow]
+            var localIndexedRows: Array[IndexedRow] = Array.empty[IndexedRow]
 
             var sendOverheads: Array[Array[Overhead]] = Array.empty[Array[Overhead]]
             var receiveOverheads: Array[Array[Overhead]] = Array.empty[Array[Overhead]]
@@ -304,24 +308,24 @@ object AlchemistSession {
 //                if (verbose) println(s"Spark executor ${idx}: Connected to Alchemist worker ${w._2.ID} at ${w._2.hostname}:${w._2.port}, requesting data ...")
                 val (_tempRows, workerSendOverheads, workerReceiveOverheads) = wc.getIndexedRows(mh, rowIndicesArray, tempRows, idx)
                 tempRows = _tempRows
+//                localIndexedRows ++= returnedIndexedRows
                 sendOverheads = sendOverheads :+ workerSendOverheads
                 receiveOverheads = receiveOverheads :+ workerReceiveOverheads
               }
             })
 
             rowIndicesArray foreach (r => {
-              requestedIndexedRows = requestedIndexedRows :+ new IndexedRow(r.toInt, new DenseVector(tempRows(r.toInt)))
+              localIndexedRows = localIndexedRows :+ new IndexedRow(r.toInt, new DenseVector(tempRows(r.toInt)))
             })
 
 //            if (verbose) println(s"Spark executor ${idx}: Finished receiving data")
-            requestedIndexedRows.iterator
+            localIndexedRows.iterator
           }
           }))
 
-      mat
+      Some(mat)
     }
-    else new IndexedRowMatrix(spark.sparkContext.parallelize((0L to 2 - 1)
-      .map(x => IndexedRow(x, new DenseVector(Array.fill(2)(0.0))))))
+    else None
   }
 
   def printIndexedRowMatrix(mat: IndexedRowMatrix): this.type = {
