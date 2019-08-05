@@ -234,9 +234,9 @@ class Client extends Serializable {
     val sendOverhead = new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
     val receiveStartTime = System.nanoTime
-    val (receiveBytes, receiveTime) = receiveMessage
-
-    val receiveOverhead = new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+//    val (receiveBytes, receiveTime) = receiveMessage
+//
+    val receiveOverhead = new Overhead(1, 0, 0, System.nanoTime - receiveStartTime)
 
     (sendOverhead, receiveOverhead)
   }

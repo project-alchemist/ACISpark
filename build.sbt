@@ -10,6 +10,8 @@ lazy val `alchemist-example` = (project in file("example"))
   .dependsOn(`alchemist`)
   .settings(
 
+    assemblyJarName in assembly := "alchemist-example-0.5.jar",
+
     target := { baseDirectory.value / "target" },
 
     libraryDependencies ++= Seq(
@@ -23,6 +25,8 @@ lazy val `alchemist-example` = (project in file("example"))
 
 lazy val `alchemist` = (project in file("."))
   .settings(
+
+    assemblyJarName in assembly := "alchemist-0.5.jar",
 
     target := { baseDirectory.value / "target" },
 

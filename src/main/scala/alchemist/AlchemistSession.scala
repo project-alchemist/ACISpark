@@ -32,8 +32,8 @@ object AlchemistSession {
 
   val driver: DriverClient = new DriverClient()
   var workers: Map[Short, WorkerInfo] = Map.empty[Short, WorkerInfo]
-  var driverBufferLength: Int = 0
-  var workerBufferLength: Int = 0
+  var driverBufferLength: Int = 10000
+  var workerBufferLength: Int = 10000000
 
   var libraries: Map[Byte, LibraryHandle] = Map.empty[Byte, LibraryHandle]
 
@@ -43,23 +43,62 @@ object AlchemistSession {
 
   def main(args: Array[String]): Unit = { }
 
-  def initialize(_spark: SparkSession,
-                 _driverBufferLength: Int = 10000,
-                 _workerBufferLength: Int = 10000000,
-                 _verbose: Boolean = true,
-                 _showOverheads: Boolean = false): this.type = {
+//  def initialize(_spark: SparkSession,
+//                 _driverBufferLength: Int = 10000,
+//                 _workerBufferLength: Int = 10000000,
+//                 _verbose: Boolean = true,
+//                 _showOverheads: Boolean = false): this.type = {
+//
+//    spark = _spark
+//    driverBufferLength = _driverBufferLength
+//    workerBufferLength = _workerBufferLength
+//    verbose = _verbose
+//    showOverheads = _showOverheads
+//
+//    print(s"Driver message buffer length set to $driverBufferLength")
+//    print(s"Worker message buffer length set to $workerBufferLength")
+//    print(s"Verbose set to $verbose")
+//
+//    driver.setBufferLength(driverBufferLength)
+//
+//    this
+//  }
 
+  def setSparkSession(_spark: SparkSession): this.type = {
     spark = _spark
+
+    this
+  }
+
+  def setDriverBufferLength(_driverBufferLength: Int = 10000): this.type = {
     driverBufferLength = _driverBufferLength
-    workerBufferLength = _workerBufferLength
-    verbose = _verbose
-    showOverheads = _showOverheads
+    driver.setBufferLength(driverBufferLength)
 
     print(s"Driver message buffer length set to $driverBufferLength")
+
+    this
+  }
+
+  def setWorkerBufferLength(_workerBufferLength: Int = 10000000): this.type = {
+    workerBufferLength = _workerBufferLength
+
     print(s"Worker message buffer length set to $workerBufferLength")
+
+    this
+  }
+
+  def setVerbose(_verbose: Boolean = true): this.type = {
+    verbose = _verbose
+
     print(s"Verbose set to $verbose")
 
-    driver.setBufferLength(driverBufferLength)
+    this
+  }
+
+  def showOverheads(_showOverheads: Boolean = false): this.type = {
+    showOverheads = _showOverheads
+
+    print(s"Showing overheads set to $showOverheads")
 
     this
   }
@@ -139,12 +178,6 @@ object AlchemistSession {
 
     if (verbose) println("Ending Alchemist session")
     disconnect
-  }
-
-  def setVerbose(_verbose: Boolean = true): this.type = {
-    verbose = _verbose
-
-    this
   }
 
   def setPrintOverheads(_showOverheads: Boolean = true): this.type = {

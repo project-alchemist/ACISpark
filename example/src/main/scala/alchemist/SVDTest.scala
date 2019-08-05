@@ -12,7 +12,9 @@ import org.apache.spark.mllib.linalg.{DenseVector, Matrices, Matrix, SingularVal
 
 object SVDTest {
 
-  def run(hostname: String, args: Array[String] = Array.empty[String]): Unit = {
+  var als = AlchemistSession
+
+  def run(hostname: String, port: Int, args: Array[String] = Array.empty[String]): Unit = {
     // Parse parameters from command line arguments
     val k: Int = if (args.length > 0) args(0).toInt else 20
     val infile: String = if (args.length > 1) args(1).toString else ""
@@ -24,7 +26,7 @@ object SVDTest {
     println(" ")
 
     // Launch Spark session
-    val startTime = System.nanoTime()
+    var startTime = System.nanoTime()
     val spark = SparkSession
       .builder()
       .appName("Alchemist SVD Test")
@@ -34,25 +36,41 @@ object SVDTest {
     println(s"Time cost of starting Spark session: ${(System.nanoTime() - startTime) * 1.0E-9}")
     println(" ")
 
-    val data: IndexedRowMatrix = {
-      if (infile.length > 0)
-        loadData(spark, infile)
-      else
-        randomData(spark, 100, 50)
+    // Launch Alchemist session
+    startTime = System.nanoTime()
+    als.setSparkSession(spark).connect(hostname, port)
+
+    if (als.connected) {
+      println(s"Time cost of starting Alchemist session: ${(System.nanoTime() - startTime) * 1.0E-9}")
+      println(" ")
+
+      als.requestWorkers(2)
+
+      val A: IndexedRowMatrix = {
+        if (infile.length > 0)
+          loadData(spark, infile)
+        else
+          randomData(spark, 100, 50)
+      }
+
+      // Print info
+      println(s"spark.conf.getAll: ${spark.conf.getAll.foreach(println)}\n")
+      println(s"Number of partitions: ${sc.defaultParallelism}")
+      println(s"getExecutorMemoryStatus: ${sc.getExecutorMemoryStatus.toString()}")
+
+      println("\n============================== Testing Spark ==============================\n")
+      testSpark(spark, A, k)
+      println("\n")
+
+      println("\n============================ Testing Alchemist ============================\n")
+      testAlchemist(A, k)
+      println("\n")
+
+      als.stop
     }
-
-    // Print info
-    println(s"spark.conf.getAll: ${spark.conf.getAll.foreach(println)}")
-    println(" ")
-    println(s"Number of partitions: ${data.rows.getNumPartitions}")
-    println(s"getExecutorMemoryStatus: ${sc.getExecutorMemoryStatus.toString()}")
-    println(" ")
-
-    println("============================== Testing Spark ==============================")
-    testSpark(spark, data, k)
-
-    println("============================ Testing Alchemist ============================")
-    testAlchemist(hostname, spark, data, k)
+    else {
+      println("\nERROR: Unable to connect to Alchemist")
+    }
 
     spark.stop
   }
@@ -88,19 +106,18 @@ object SVDTest {
     println("Relative Error is " + relativeError.toString)
   }
 
-  def testAlchemist(hostname: String, spark: SparkSession, A: IndexedRowMatrix, k: Int): Unit = {
+  def testAlchemist(A: IndexedRowMatrix, k: Int): Unit = {
 
-    val sc = spark.sparkContext
+    val sc = als.spark.sparkContext
     // Compute the squared Frobenius norm
     val sqFroNorm: Double = A.rows.map(row => Vectors.norm(row.vector, 2))
       .map(norm => norm * norm)
       .reduce((a, b) => a + b)
 
-    // Launch Alchemist
-    var startTime = System.nanoTime()
-    val als = AlchemistSession.initialize(spark).connect(hostname, 24960).requestWorkers(2)
-    println(s"Time cost of starting Alchemist session: ${(System.nanoTime() - startTime) * 1.0E-9}")
-    println(" ")
+    als.sendIndexedRowMatrix(A) match {
+      case Some(mh) => println("\nComputing SVD of IndexedRowMatrix 'A'")
+      case None => println("\nERROR: Unable to send IndexedRowMatrix 'A' to Alchemist")
+    }
 //
 ////    // Convert data to indexed vectors and labels
 ////    startTime = System.nanoTime()
@@ -144,8 +161,6 @@ object SVDTest {
 //    println("Squared Frobenius error of rank " + k.toString + " SVD is " + err.toString)
 //    println("Squared Frobenius norm of A is " + sqFroNorm.toString)
 //    println("Relative Error is " + relativeError.toString)
-
-    als.stop
   }
 
   def randomData(spark: SparkSession, numRows: Long, numCols: Long): IndexedRowMatrix = {
