@@ -226,7 +226,7 @@ object AlchemistSession {
   // ----------------------------------------- Library Management -----------------------------------------
 
 
-  def loadLibrary(name: String, path: String, jar: String): LibraryHandle = {
+  def loadLibrary(name: String, path: String): LibraryHandle = {
 
     if (checkIfConnected) {
       if (verbose) println(s"Loading library $name at $path")
@@ -250,7 +250,7 @@ object AlchemistSession {
 
   // --------------------------------------------------------------------------------------------------------
 
-  def runTask(lib: LibraryHandle, name: String, inArgs: Parameters): Parameters = {
+  def runTask(lib: LibraryHandle, name: String, inArgs: Parameters): Option[Parameters] = {
 
     if (checkIfConnected) {
       if (verbose) print(s"Alchemist running task '$name' ... ")
@@ -259,9 +259,9 @@ object AlchemistSession {
 
       if (verbose && showOverheads) printOverheads("runTask", sendOverhead, receiveOverhead)
 
-      outArgs
+      Some(outArgs)
     }
-    else new Parameters
+    else None
   }
 
   def getMatrixHandle(mat: DistributedMatrix, name: String = ""): MatrixHandle = {

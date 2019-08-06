@@ -286,6 +286,7 @@ class Message() {
       case Datatype.Double.value => Parameter[Double](name, readDouble)
       case Datatype.String.value => Parameter[String](name, readString)
       case Datatype.MatrixID.value => Parameter[MatrixID](name, readMatrixID)
+      case Datatype.MatrixInfo.value => Parameter[MatrixHandle](name, readMatrixInfo)
       case _ => {
         val message: String = s"Parameters cannot have datatype ${Datatype.withValue(parameterDatatype).label}"
         throw new InconsistentDatatypeException(message)

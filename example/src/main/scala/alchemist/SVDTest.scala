@@ -13,11 +13,19 @@ import org.apache.spark.mllib.linalg.{DenseVector, Matrices, Matrix, SingularVal
 object SVDTest {
 
   var als = AlchemistSession
+  var lib_path: String = ""
 
-  def run(hostname: String, port: Int, args: Array[String] = Array.empty[String]): Unit = {
+  def run(_lib_path: String,
+          hostname: String = "localhost",
+          port: Int = 24960,
+          args: Array[String] = Array.empty[String]): Unit = {
+
+    lib_path = _lib_path
+
     // Parse parameters from command line arguments
-    val k: Int = if (args.length > 0) args(0).toInt else 20
+    val k: Int = if (args.length > 0) args(0).toInt else 5
     val infile: String = if (args.length > 1) args(1).toString else ""
+
     // Print Info
     println("Settings: ")
     println(s"  Target dimension: ${k.toString}")
@@ -50,7 +58,7 @@ object SVDTest {
         if (infile.length > 0)
           loadData(spark, infile)
         else
-          randomData(spark, 100, 50)
+          randomData(spark, 10, 10)
       }
 
       // Print info
@@ -114,8 +122,28 @@ object SVDTest {
       .map(norm => norm * norm)
       .reduce((a, b) => a + b)
 
+    val lh = als.loadLibrary("TestLib", lib_path)
+
     als.sendIndexedRowMatrix(A) match {
-      case Some(mh) => println("\nComputing SVD of IndexedRowMatrix 'A'")
+      case Some(ah) => {
+        println("\nComputing SVD of IndexedRowMatrix 'A'")
+
+        val inArgs: Parameters = new Parameters
+        inArgs.add[MatrixID]("A", ah.id)
+        inArgs.add[Int]( "rank", k)
+
+        inArgs.list("    ", withType = true)
+
+        val outArgs: Option[Parameters] = als.runTask(lh,"truncated_svd", inArgs)
+        outArgs match {
+          case Some(outArgs) => {
+            println("List of output arguments:")
+            outArgs.list("    ", withType = true)
+            println(" ")
+          }
+          case None => println("\nERROR: Alchemist unable to run task 'svd'")
+        }
+      }
       case None => println("\nERROR: Unable to send IndexedRowMatrix 'A' to Alchemist")
     }
 //

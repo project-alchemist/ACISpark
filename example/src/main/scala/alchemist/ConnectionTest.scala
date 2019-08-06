@@ -10,7 +10,10 @@ object ConnectionTest {
 
   var als = AlchemistSession
 
-  def run(hostname: String = "localhost", port: Int = 24960, args: Array[String] = Array.empty[String]): Unit = {
+  def run(lib_path: String = "",
+          hostname: String = "localhost",
+          port: Int = 24960,
+          args: Array[String] = Array.empty[String]): Unit = {
 
     Logger.getLogger("org").setLevel(Level.OFF)
     val spark = SparkSession
@@ -35,7 +38,7 @@ object ConnectionTest {
         .listAssignedWorkers
         .sendTestString()
 
-      val lh = als.loadLibrary("TestLib", "/Users/kai/Projects/AlLib/target/testlib.dylib", "libs/testlib-assembly-0.1.jar")
+      val lh = als.loadLibrary("TestLib", lib_path)
 
       val inArgs: Parameters = new Parameters
       inArgs.add[Byte]("in_byte", 9.asInstanceOf[Byte])
@@ -47,10 +50,15 @@ object ConnectionTest {
       inArgs.add[Double]("in_double", 88.88888888888888888)
       inArgs.add[String]("in_string", "test string")
 
-      val outArgs: Parameters = als.runTask(lh,"greet", inArgs)
-      println("List of output arguments:")
-      outArgs.list("    ", withType = true)
-      println(" ")
+      val outArgs: Option[Parameters] = als.runTask(lh,"greet", inArgs)
+      outArgs match {
+        case Some(outArgs) => {
+          println("List of output arguments:")
+          outArgs.list("    ", withType = true)
+          println(" ")
+        }
+        case None => println("\nERROR: Alchemist unable to run task 'greet'")
+      }
 
       val mat: IndexedRowMatrix = randomData(spark, 20, 5)
 
