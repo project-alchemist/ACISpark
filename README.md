@@ -4,7 +4,7 @@ ACISpark is the Apache Spark interface for Alchemist, a HPC interface for data a
 
 ## Requirements
 
-ACISpark requires Scala (tested with version 2.11.12), Apache Spark (tested with version 2.4.0), sbt (tested with version 1.2.8), and the latest version of Alchemist and the testing library TestLib (https://github.com/project-alchemist/TestLib). Other versions of Scala, Apark and sbt will probably work fine as long as they're not too old. Note that pre-built binaries of Apache Spark 2.4.x, except for 2.4.2, are compiled for Scala 2.11, therefore ACISpark has not been tested with Scala 2.12, but it seems unlikey that ACISpark itself would have issues with it.
+ACISpark requires Scala (tested with version 2.11.12), Apache Spark (tested with version 2.4.0), sbt (tested with version 1.2.8), and the latest version of Alchemist and the testing library TestLib (https://github.com/project-alchemist/TestLib). Other versions of Scala, Spark and sbt will probably work fine as long as they're not too old. Note that pre-built binaries of Apache Spark 2.4.x, except for 2.4.2, are compiled for Scala 2.11, therefore ACISpark has not been tested with Scala 2.12, but it seems unlikey that ACISpark itself would have issues with it.
 
 ## Downloading and building ACISpark
 
