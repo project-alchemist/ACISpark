@@ -27,7 +27,7 @@ Use `spark-submit` to run the tests, for instance
 
 `spark-submit --master local[$1] --class alchemist.TestRunner $ACISPARK_JAR $2 $3 $4 $5 ...`
 
-where `$1` is the number of nodes the user want ACISpark to run on and `$2` is either `connection` for the connection test or `svd` for the SVD test. `$3` is the path of the shared library file (.so on Linux, .dylib on Mac) for the TestLib library. ``$4` and `$5` are the hostname and port number that Alchemist is running on; if omitted, they will default to `localhost` and `24960`, respectively, which assumes that Alchemist is running on port 24960 on the same machine as ACISpark. Additional arguments (`$5`, `$6`, etc.) will be forwarded as input parameters to the test, for instance the rank k of the truncated SVD.
+where `$1` is the number of nodes the user want ACISpark to run on and `$2` is either `connection` for the connection test or `svd` for the SVD test. `$3` is the path of the shared library file (.so on Linux, .dylib on Mac) for the TestLib library. `$4` and `$5` are the hostname and port number that Alchemist is running on; if omitted, they will default to `localhost` and `24960`, respectively, which assumes that Alchemist is running on port 24960 on the same machine as ACISpark. Additional arguments (`$5`, `$6`, etc.) will be forwarded as input parameters to the test, for instance the rank k of the truncated SVD.
 
 ---------------------------------------------------
 
