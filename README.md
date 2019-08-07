@@ -29,7 +29,16 @@ Use `spark-submit` to run the tests, for instance
 
 where `$1` is the number of nodes the user want ACISpark to run on and `$2` is either `connection` for the connection test or `svd` for the SVD test. `$3` is the path of the shared library file (.so on Linux, .dylib on Mac) for the TestLib library. `$4` and `$5` are the hostname and port number that Alchemist is running on; if omitted, they will default to `localhost` and `24960`, respectively, which assumes that Alchemist is running on port 24960 on the same machine as ACISpark. Additional arguments (`$5`, `$6`, etc.) will be forwarded as input parameters to the test, for instance the rank k of the truncated SVD.
 
+See `ACISpark/example/src/main/scala/alchemist/SVDTest.scala` for the truncated SVD test and `ACISpark/example/src/main/scala/alchemist/ConnectionTest.scala` for the connection test.
+
 ---------------------------------------------------
 
 Additional example codes and more extensive documentation will be added at a later date.
+
+## To-Do
+
+1) **Message splitting when buffer length < message length**. Currently limited to sending short messages or making buffer lengths on worker clients perhaps unreasonably large. *Expected end of August 2019*.
+2) **Support for distributed matrix layouts**. Currently limited to basic layouts. *Expected end of August 2019*.
+3) **Settings files and more command-line options**. Currently basic settings are sent as command-line arguments. *Expected end of August 2019*.
+3) **Better error handling**. *Ongoing*
 
