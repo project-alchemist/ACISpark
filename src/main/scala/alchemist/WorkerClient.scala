@@ -79,7 +79,7 @@ class WorkerClient extends Client with Serializable {
 
       localRows.sorted
 
-      rowStart = localRows(0) + rows(2) - (localRows(0) % rows(2)) - 1
+      rowStart = localRows(0) + (rows(0) + (localRows(0) % rows(2))) % rows(2)
       rowEnd = localRows.last
 
       val messageRows: Array[Long] = Array(rowStart, rowEnd, rows(2))
@@ -152,7 +152,7 @@ class WorkerClient extends Client with Serializable {
 
       localRows.sorted
 
-      rowStart = localRows(0) + rows(2) - (localRows(0) % rows(2)) - 1
+      rowStart = localRows(0) + (rows(0) + (localRows(0) % rows(2))) % rows(2)
       rowEnd = localRows.last
 
       writeMessage.writeLong(rowStart)

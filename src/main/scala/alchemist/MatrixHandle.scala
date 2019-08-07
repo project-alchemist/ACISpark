@@ -34,14 +34,18 @@ class MatrixHandle(val id: MatrixID = MatrixID(0), val name: String = "", val nu
 
     var rows: Array[Long] = Array.empty[Long]
 
-    if (layout == Layout.MC_MR.value)
-      rows = Array(grid.array(ID)(0).toLong, numRows-1, grid.numRows.toLong)
-    else if (layout == Layout.MR_MC.value)
-      rows = Array(grid.array(ID)(1).toLong, numRows-1, grid.numCols.toLong)
-    else if (layout == Layout.VC_STAR.value)
-      rows = Array(grid.array(ID)(1).toLong, numRows-1, (grid.numCols * grid.numRows).toLong)
-    else if (layout == Layout.VR_STAR.value)
-      rows = Array(grid.array(ID)(1).toLong, numRows-1, 1l)
+    if (numRows == 1)
+      rows = Array(0l, 0l, 1l)
+    else {
+      if (layout == Layout.MC_MR.value)
+        rows = Array(grid.array(ID)(0).toLong, numRows-1, grid.numRows.toLong)
+      else if (layout == Layout.MR_MC.value)
+        rows = Array(grid.array(ID)(1).toLong, numRows-1, grid.numCols.toLong)
+      else if (layout == Layout.VC_STAR.value)
+        rows = Array(grid.array(ID)(1).toLong, numRows-1, (grid.numCols * grid.numRows).toLong)
+      else if (layout == Layout.VR_STAR.value)
+        rows = Array(grid.array(ID)(1).toLong, numRows-1, (grid.numCols * grid.numRows).toLong)
+    }
 
     rows
   }
@@ -50,14 +54,18 @@ class MatrixHandle(val id: MatrixID = MatrixID(0), val name: String = "", val nu
 
     var cols: Array[Long] = Array.empty[Long]
 
-    if (layout == Layout.MC_MR.value)
-      cols = Array(grid.array(ID)(1).toLong, numCols-1, grid.numCols.toLong)
-    else if (layout == Layout.MR_MC.value)
-      cols = Array(grid.array(ID)(1).toLong, numCols-1, grid.numRows.toLong)
-    else if (layout == Layout.VC_STAR.value)
-      cols = Array(grid.array(ID)(1).toLong, numCols-1, 1l)
-    else if (layout == Layout.VR_STAR.value)
-      cols = Array(grid.array(ID)(1).toLong, numCols-1, (grid.numCols * grid.numRows).toLong)
+    if (numCols == 1)
+      cols = Array(0l, 0l, 1l)
+    else {
+      if (layout == Layout.MC_MR.value)
+        cols = Array(grid.array(ID)(0).toLong, numCols-1, grid.numCols.toLong)
+      else if (layout == Layout.MR_MC.value)
+        cols = Array(grid.array(ID)(1).toLong, numCols-1, grid.numRows.toLong)
+      else if (layout == Layout.VC_STAR.value)
+        cols = Array(grid.array(ID)(0).toLong, numCols-1, 1l)
+      else if (layout == Layout.VR_STAR.value)
+        cols = Array(grid.array(ID)(0).toLong, numCols-1, 1l)
+    }
 
     cols
   }

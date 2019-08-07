@@ -23,7 +23,7 @@ class DriverClient extends Client {          // Connects to the Alchemist driver
 
     val outArgs: Parameters = new Parameters
 
-    readMessage.print
+//    readMessage.print
 
     while (!readMessage.eom)
       outArgs.add(readMessage.readParameter)

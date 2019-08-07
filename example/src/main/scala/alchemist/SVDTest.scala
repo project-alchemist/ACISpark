@@ -58,7 +58,7 @@ object SVDTest {
         if (infile.length > 0)
           loadData(spark, infile)
         else
-          randomData(spark, 10, 10)
+          randomData(spark, 2000, 1000)
       }
 
       // Print info
@@ -68,11 +68,10 @@ object SVDTest {
 
       println("\n============================== Testing Spark ==============================\n")
       testSpark(spark, A, k)
-      println("\n")
 
       println("\n============================ Testing Alchemist ============================\n")
       testAlchemist(A, k)
-      println("\n")
+      println(" ")
 
       als.stop
     }
@@ -93,12 +92,13 @@ object SVDTest {
       .reduce((a, b) => a + b)
 
     // Spark built-in truncated SVD
+    println("\nComputing SVD of IndexedRowMatrix A:")
     val startTime = System.nanoTime()
     val svd: SingularValueDecomposition[IndexedRowMatrix, Matrix] = A.computeSVD(k)
 //    val mat: RowMatrix = new RowMatrix(data.map(pair => pair._2))
 //    val svd: SingularValueDecomposition[RowMatrix, Matrix] = mat.computeSVD(k, computeU = false)
 //    val v: Matrix = svd.V
-    println(s"Time cost of Spark truncated SVD clustering: ${(System.nanoTime() - startTime) * 1.0E-9}")
+    println(s"Time cost of Spark truncated SVD: ${(System.nanoTime() - startTime) * 1.0E-9}")
     println(" ")
 
     // Compute approximation error
@@ -126,20 +126,50 @@ object SVDTest {
 
     als.sendIndexedRowMatrix(A) match {
       case Some(ah) => {
-        println("\nComputing SVD of IndexedRowMatrix 'A'")
+        println("\nComputing SVD of IndexedRowMatrix A:")
 
         val inArgs: Parameters = new Parameters
         inArgs.add[MatrixID]("A", ah.id)
         inArgs.add[Int]( "rank", k)
 
-        inArgs.list("    ", withType = true)
-
+        var startTime = System.nanoTime()
         val outArgs: Option[Parameters] = als.runTask(lh,"truncated_svd", inArgs)
         outArgs match {
           case Some(outArgs) => {
+            println(s"Time cost of Alchemist truncated SVD: ${(System.nanoTime() - startTime) * 1.0E-9}")
+            println(" ")
             println("List of output arguments:")
             outArgs.list("    ", withType = true)
             println(" ")
+
+            val Sh: MatrixHandle = outArgs.get[MatrixHandle]("S")
+            val Uh: MatrixHandle = outArgs.get[MatrixHandle]("U")
+            val Vh: MatrixHandle = outArgs.get[MatrixHandle]("V")
+
+            // Fetch IndexedRowMatrix V from Alchemist using handle Vh
+            als.getIndexedRowMatrix(Vh) match {
+              case Some(v) => {
+                startTime = System.nanoTime()
+                val V: Array[Array[Double]] = v.rows.map(row => row.vector.toArray).collect
+                val d = V.size
+                val matV: Matrix = Matrices.dense(k, d, V.flatten)
+                println(s"Time cost of Alchemist matrix V to local matrix: ${(System.nanoTime() - startTime) * 1.0E-9}")
+                println(" ")
+
+                // Compute approximation error
+                val vBroadcast = sc.broadcast(matV)
+                val err: Double = A.rows
+                  .map(row => (row.vector, vBroadcast.value.multiply(row.vector)))
+                  .map(pair => (pair._1, Vectors.dense(vBroadcast.value.transpose.multiply(pair._2).toArray)))
+                  .map(pair => Vectors.sqdist(pair._1, pair._2))
+                  .reduce((a, b) => a + b)
+                val relativeError = err / sqFroNorm
+                println("Squared Frobenius error of rank " + k.toString + " SVD is " + err.toString)
+                println("Squared Frobenius norm of A is " + sqFroNorm.toString)
+                println("Relative Error is " + relativeError.toString)
+              }
+              case None => println("\nERROR: Unable to retrieve copy of matrix 'V' from Alchemist")
+            }
           }
           case None => println("\nERROR: Alchemist unable to run task 'svd'")
         }

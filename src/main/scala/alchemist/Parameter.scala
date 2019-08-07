@@ -76,6 +76,7 @@ class Parameters {
       case Parameter(n: String, v: Char) => ps = ps + (p.asInstanceOf[Parameter[Char]].name -> p)
       case Parameter(n: String, v: String) => ps = ps + (p.asInstanceOf[Parameter[String]].name -> p)
       case Parameter(n: String, v: MatrixID) => ps = ps + (p.asInstanceOf[Parameter[MatrixID]].name -> p)
+      case Parameter(n: String, v: MatrixHandle) => ps = ps + (p.asInstanceOf[Parameter[MatrixHandle]].name -> p)
       case _ => ps = ps + ("UNKNOWN TYPE" -> p)
     }
     this

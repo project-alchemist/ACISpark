@@ -17,11 +17,11 @@ object TestRunner {
 
       if (test == "connection") {
         println("Running connection test")
-        ConnectionTest.run(lib_path, hostname, port, args.drop(3))
+        ConnectionTest.run(lib_path, hostname, port, args.drop(4))
       }
       else if (test == "svd") {
         println("Running SVD test")
-        SVDTest.run(lib_path, hostname, port, args.drop(3))
+        SVDTest.run(lib_path, hostname, port, args.drop(4))
       }
       else {
         println("ERROR: No valid test selected")
