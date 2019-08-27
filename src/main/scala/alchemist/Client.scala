@@ -108,9 +108,7 @@ class Client extends Serializable {
 
   def handshake: (Boolean, Overhead, Overhead) = {
 
-    val testMatrix: MatrixBlock = new MatrixBlock(
-      (for {r <- 3 to 14} yield 1.11*r).toArray, Array[Long](0l, 3l, 1l), Array[Long](0l, 2l, 1l)
-    )
+    val testMatrix: MatrixBlock = new MatrixBlock((for {r <- 3 to 14} yield 1.11*r).toArray, (0l, 3l, 1l), (0l, 2l, 1l))
 
     val sendStartTime = System.nanoTime
 

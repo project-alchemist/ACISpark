@@ -332,8 +332,8 @@ object AlchemistSession {
             var sendOverheads: Array[Array[Overhead]] = Array.empty[Array[Overhead]]
             var receiveOverheads: Array[Array[Overhead]] = Array.empty[Array[Overhead]]
 
-            var tempRows: scala.collection.mutable.Map[Int, Array[Double]] = scala.collection.mutable.Map.empty[Int, Array[Double]]
-            rowIndicesArray foreach (r => tempRows += (r.toInt -> Array.fill[Double](mh.numCols.toInt)(0.0)))
+            var tempRows: scala.collection.mutable.Map[Long, Array[Double]] = scala.collection.mutable.Map.empty[Long, Array[Double]]
+            rowIndicesArray foreach (r => tempRows += (r -> Array.fill[Double](mh.numCols.toInt)(0.0)))
 
             workers foreach (w => {
 //              if (verbose) println(s"Spark executor ${idx}: Connecting to Alchemist worker ${w._2.ID} at ${w._2.hostname}:${w._2.port}")
@@ -348,7 +348,7 @@ object AlchemistSession {
             })
 
             rowIndicesArray foreach (r => {
-              localIndexedRows = localIndexedRows :+ new IndexedRow(r.toInt, new DenseVector(tempRows(r.toInt)))
+              localIndexedRows = localIndexedRows :+ new IndexedRow(r, new DenseVector(tempRows(r)))
             })
 
 //            if (verbose) println(s"Spark executor ${idx}: Finished receiving data")

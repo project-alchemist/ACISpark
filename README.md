@@ -37,8 +37,7 @@ Additional example codes and more extensive documentation will be added at a lat
 
 ## To-Do
 
-1) **Message splitting when buffer length < message length**. Currently limited to sending short messages or making buffer lengths on worker clients perhaps unreasonably large. *Expected end of August 2019*.
-2) **Support for distributed matrix layouts**. Currently limited to basic layouts. *Expected end of August 2019*.
-3) **Settings files and more command-line options**. Currently basic settings are sent as command-line arguments. *Expected end of August 2019*.
+1) **Support for distributed matrix layouts**. Currently limited to basic layouts. *Expected beginning of September 2019*.
+2) **Settings files and more command-line options**. Currently basic settings are sent as command-line arguments. *Expected beginning of September 2019*.
 3) **Better error handling**. *Ongoing*
 

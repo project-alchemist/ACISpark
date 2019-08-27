@@ -84,7 +84,9 @@ class Message() {
     return false
   }
 
-  def previewNextDatatype: Byte = messageBuffer.get(messageBuffer.asInstanceOf[Buffer].position)
+  def previewNextDatatype: Byte = {
+    messageBuffer.get(messageBuffer.asInstanceOf[Buffer].position)
+  }
 
   def getMatrixID: MatrixID = {
     MatrixID(messageBuffer.getShort)
@@ -149,6 +151,8 @@ class Message() {
 
     new MatrixHandle(ID, name, numRows, numCols, sparse, layout, new ProcessGrid(numGridRows, numGridCols, gridArray))
   }
+
+  def getDouble: Double = messageBuffer.getDouble()
 
   @throws(classOf[InconsistentDatatypeException])
   def readByte: Byte = {
@@ -389,27 +393,28 @@ class Message() {
       throw new InconsistentDatatypeException(message)
     }
 
-    val rows: Array[Long] = Array(0l, 0l, 1l)
-    val cols: Array[Long] = Array(0l, 0l, 1l)
+    val rowStart: Long = messageBuffer.getLong
+    val rowEnd: Long   = messageBuffer.getLong
+    val rowStep: Long  = messageBuffer.getLong
+    val colStart: Long = messageBuffer.getLong
+    val colEnd: Long   = messageBuffer.getLong
+    val colStep: Long  = messageBuffer.getLong
+    val empty: Byte    = messageBuffer.get
 
-    for (i <- 0 until 3)
-      rows(i) = messageBuffer.getLong
+    if (empty != 0 & readData) {
+      val numRows: Long = math.ceil(1.0 * ((rowEnd - rowStart)/ rowStep)+1l).toLong
+      val numCols: Long = math.ceil(1.0 * ((colEnd - colStart)/ colStep)+1l).toLong
+      val numElements: Long = numRows * numCols
 
-    for (i <- 0 until 3)
-      cols(i) = messageBuffer.getLong
+      val data = Array.fill[Double](numElements.toInt)(0.0)
+      (0 until numElements.toInt).foreach(i => data(i) = messageBuffer.getDouble)
 
-    val size: Long = math.ceil(1.0 * ((rows(1) - rows(0))/ rows(2))+1).toLong * math.ceil(1.0 * ((cols(1)-cols(0))/ cols(2))+1).toLong
-
-    if (readData) {
-      val data = Array.fill[Double](size.toInt)(0.0)
-      (0 until size.toInt).foreach(i => data(i) = messageBuffer.getDouble)
-
-      new MatrixBlock(data, rows, cols)
+      new MatrixBlock(data, (rowStart, rowEnd, rowStep), (colStart, colEnd, colStep))
     }
     else {
       val data = Array.empty[Double]
 
-      new MatrixBlock(data, rows, cols)
+      new MatrixBlock(data, (rowStart, rowEnd, rowStep), (colStart, colEnd, colStep))
     }
   }
 
@@ -519,9 +524,21 @@ class Message() {
   }
 
   def putMatrixBlock(block: MatrixBlock): this.type = {
-    block.rows.foreach(r => messageBuffer.putLong(r))
-    block.cols.foreach(c => messageBuffer.putLong(c))
-    block.data.foreach(v => messageBuffer.putDouble(v))
+    messageBuffer.putLong(block.rows._1)
+    messageBuffer.putLong(block.rows._2)
+    messageBuffer.putLong(block.rows._3)
+    messageBuffer.putLong(block.cols._1)
+    messageBuffer.putLong(block.cols._2)
+    messageBuffer.putLong(block.cols._3)
+    if (block.data.length == 0) {
+      val emptyValue: Byte = 0
+      messageBuffer.put(emptyValue)
+    }
+    else {
+      val emptyValue: Byte = 1
+      messageBuffer.put(emptyValue)
+      block.data.foreach(v => messageBuffer.putDouble(v))
+    }
 
     this
   }
@@ -633,7 +650,7 @@ class Message() {
         case Datatype.WorkerInfo.value => data = data.concat(s" ${readWorkerInfo.toString(true)}")
         case Datatype.MatrixID.value => data = data.concat(s" ${readMatrixID.value} ")
         case Datatype.MatrixInfo.value => data = data.concat(s" ${readMatrixInfo.toString(space + "                                ")}")
-        case Datatype.MatrixBlock.value => data = data.concat(s" ${readMatrixBlock(true).toString(space + "                                 ")}")
+        case Datatype.MatrixBlock.value => data = data.concat(s" ${readMatrixBlock(true).toString(space + "                                 ", true)}")
         case Datatype.IndexedRow.value => data = data.concat(s" ${readIndexedRow.toString}")
         case Datatype.Parameter.value => {
           val p = readParameter

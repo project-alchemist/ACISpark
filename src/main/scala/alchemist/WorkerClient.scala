@@ -42,71 +42,55 @@ class WorkerClient extends Client with Serializable {
                       indexedRows: Array[IndexedRow],
                       idx: Int): (Array[Overhead], Array[Overhead]) = {
 
-    val times: Array[Long] = Array.fill[Long](4)(0)
-
-    val rows: Array[Long] = mh.getRowAssignments(ID)
-    val cols: Array[Long] = mh.getColAssignments(ID)
-
-    val numRows: Long = math.ceil((rows(1) - rows(0) + 1) / rows(2)).toLong
-    val numCols: Long = math.ceil((cols(1) - cols(0) + 1) / cols(2)).toLong
-
-    val numElements: Long = numRows * numCols
-    val numMessages: Short = math.ceil((numElements * 8.0) / writeMessage.maxBodyLength).toShort
-
-    val numRowsPerMessage: Long = math.ceil(numRows / numMessages).toLong
-    var numSentElements: Long = 0l
-
-    var rowStart: Long = 0
-    var rowEnd: Long = 0
-
     var sendOverheads: Array[Overhead] = Array.empty[Overhead]
     var receiveOverheads: Array[Overhead] = Array.empty[Overhead]
 
-    for (m <- 0 until numMessages) {
+    // Row and column indices on connected Alchemist worker
+    val (rowStart, rowEnd, rowStep): (Long, Long, Long) = mh.getRowAssignments(ID)
+    val (colStart, colEnd, colStep): (Long, Long, Long) = mh.getColAssignments(ID)
+
+    val workerRows: Array[Long] = (rowStart to rowEnd by rowStep).toArray
+    val workerCols: Array[Long] = (colStart to colEnd by colStep).toArray
+
+    // Row indices on current partition
+    val localRows: Array[Long] = for (row <- indexedRows) yield row.index
+
+    // Row and column indices that need to be sent from current partition to connected Alchemist worker
+    val localRowsToSend: Array[Long] = localRows.intersect(workerRows)
+
+    // Calculate number of required number of messages to send data
+    val numElements: Long = localRowsToSend.length * workerCols.length
+    val numMessages: Short = math.ceil((numElements * 8.0) / writeMessage.maxBodyLength).toShort
+
+    // Calculate the local rows to send for each message
+    val numRowsPerMessage: Int = math.ceil(localRowsToSend.length / numMessages).toInt
+    val messageRows: List[Array[Long]] = localRowsToSend.sliding(numRowsPerMessage, numRowsPerMessage).toList
+
+    // Send data
+    for (currentMessageRows <- messageRows) {
 
       val sendStartTime = System.nanoTime
 
+      // Start new message with 'SendMatrixBlocks' command
       writeMessage.start(clientID, sessionID, Command.SendMatrixBlocks)
       writeMessage.writeMatrixID(mh.id)
 
-      rowEnd += (numRowsPerMessage - 1) * rows(2)
+      // For every local indexedRow, check if this row needs to be sent to the connected worker, in the current message
+      for (row <- indexedRows if currentMessageRows.contains(row.index)) {
 
-      var localRows: Array[Long] = Array.empty[Long]
-
-      indexedRows foreach (row => {
-        localRows = localRows :+ row.index
-      } )
-
-      localRows.sorted
-
-      rowStart = localRows(0) + (rows(0) + (localRows(0) % rows(2))) % rows(2)
-      rowEnd = localRows.last
-
-      val messageRows: Array[Long] = Array(rowStart, rowEnd, rows(2))
-
-      val block: MatrixBlock = new MatrixBlock(Array.empty[Double], messageRows, cols)
-
-      writeMessage.writeMatrixBlock(block)
-
-      for (i <- rowStart to rowEnd by rows(2)) {
-        indexedRows foreach (row => {
-          if (row.index == i) {
-            val rowArray: Array[Double] = row.vector.toArray
-            for (j <- cols(0) to cols(1) by cols(2))
-              writeMessage.putDouble(rowArray(j.toInt))
-          }
-        })
+        // If yes, create MatrixBlock for this row with data from indexedRow 'row'
+        val block: MatrixBlock = new MatrixBlock(row.vector.toArray, row.index, (colStart, colEnd, colStep))
+        writeMessage.writeMatrixBlock(block)
       }
 
+      // Send message and store timing results
       val (sendBytes, sendTime) = sendMessage
       sendOverheads = sendOverheads :+ new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-      val (receiveBytes, receiveTime) = receiveMessage
+      // Receive response and store timing results
       val receiveStartTime = System.nanoTime
-
+      val (receiveBytes, receiveTime) = receiveMessage
       receiveOverheads = receiveOverheads :+ new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
-
-      rowStart = rowEnd + rows(2)
     }
 
     (sendOverheads, receiveOverheads)
@@ -114,69 +98,66 @@ class WorkerClient extends Client with Serializable {
 
   def getIndexedRows(mh: MatrixHandle,
                      rowIndices: Array[Long],
-                     tempRows: scala.collection.mutable.Map[Int, Array[Double]],
-                     idx: Int): (scala.collection.mutable.Map[Int, Array[Double]], Array[Overhead], Array[Overhead]) = {
-
-    val rows: Array[Long] = mh.getRowAssignments(ID)
-    val cols: Array[Long] = mh.getColAssignments(ID)
-
-    val numRows: Long = math.ceil((rows(1) - rows(0) + 1) / rows(2)).toLong
-    val numCols: Long = math.ceil((cols(1) - cols(0) + 1) / cols(2)).toLong
-
-    val numElements: Long = numRows * numCols
-    val numMessages: Short = math.ceil((numElements * 8.0) / writeMessage.maxBodyLength).toShort
-
-    val numRowsPerMessage: Long = math.ceil(numRows / numMessages).toLong
-    var numSentElements: Long = 0l
-
-    var rowStart: Long = 0
-    var rowEnd: Long = 0
+                     tempRows: scala.collection.mutable.Map[Long, Array[Double]],
+                     idx: Int): (scala.collection.mutable.Map[Long, Array[Double]], Array[Overhead], Array[Overhead]) = {
 
     var sendOverheads: Array[Overhead] = Array.empty[Overhead]
     var receiveOverheads: Array[Overhead] = Array.empty[Overhead]
 
-    for (m <- 0 until numMessages) {
+    // Row and column indices on connected Alchemist worker
+    val (rowStart, rowEnd, rowStep): (Long, Long, Long) = mh.getRowAssignments(ID)
+    val (colStart, colEnd, colStep): (Long, Long, Long) = mh.getColAssignments(ID)
+
+    val workerRows: Array[Long] = (rowStart to rowEnd by rowStep).toArray
+    val workerCols: Array[Long] = (colStart to colEnd by colStep).toArray
+
+    // Row indices on current partition
+    val localRows: Array[Long] = for (row <- rowIndices) yield row
+
+    // Row indices that need to be received from connected Alchemist worker to current partition
+    val localRowsToReceive: Array[Long] = localRows.intersect(workerRows)
+
+    // Calculate number of required number of messages to send data
+    val numElements: Long = localRowsToReceive.length * workerCols.length
+    val numMessages: Short = math.ceil((numElements * 8.0) / writeMessage.maxBodyLength).toShort
+
+    // Calculate the local rows to send for each message
+    val numRowsPerMessage: Int = math.ceil(localRowsToReceive.length / numMessages).toInt
+    val messageRows: List[Array[Long]] = localRowsToReceive.sliding(numRowsPerMessage, numRowsPerMessage).toList
+
+    // Receive data
+    for (currentMessageRows <- messageRows) {
 
       val sendStartTime = System.nanoTime
 
+      // Start new message with 'RequestMatrixBlocks' command
       writeMessage.start(clientID, sessionID, Command.RequestMatrixBlocks)
       writeMessage.writeMatrixID(mh.id)
 
-      rowEnd += (numRowsPerMessage - 1) * rows(2)
+      // For every local indexedRow, check if this row needs to be sent to the connected worker, in the current message
+      for (row <- rowIndices if currentMessageRows.contains(row)) {
 
-      var localRows: Array[Long] = Array.empty[Long]
+        // If yes, create empty MatrixBlock for this row
+        val block: MatrixBlock = new MatrixBlock(Array.empty[Double], row, (colStart, colEnd, colStep))
+        writeMessage.writeMatrixBlock(block)
+      }
 
-      rowIndices foreach (rowIndex => {
-        localRows = localRows :+ rowIndex
-      })
-
-      localRows.sorted
-
-      rowStart = localRows(0) + (rows(0) + (localRows(0) % rows(2))) % rows(2)
-      rowEnd = localRows.last
-
-      writeMessage.writeLong(rowStart)
-      writeMessage.writeLong(rowEnd)
-      writeMessage.writeLong(rows(2))
-      writeMessage.writeLong(cols(0))
-      writeMessage.writeLong(cols(1))
-      writeMessage.writeLong(cols(2))
-
+      // Send message and store timing results
       val (sendBytes, sendTime) = sendMessage
       sendOverheads = sendOverheads :+ new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
 
-      val (receiveBytes, receiveTime) = receiveMessage
+      // Receive response and store timing results
       val receiveStartTime = System.nanoTime
+      val (receiveBytes, receiveTime) = receiveMessage
 
       val mid: MatrixID = readMessage.readMatrixID
 
       if (mh.id == mid) {
-        val mb: MatrixBlock = readMessage.readMatrixBlock(false)
+        while (!readMessage.eom) {
+          val mb: MatrixBlock = readMessage.readMatrixBlock(false)
 
-        for (i <- mb.rows(0) to mb.rows(1) by mb.rows(2)) {
-          for (j <- mb.cols(0) to mb.cols(1) by mb.cols(2)) {
-            tempRows(i.toInt)(j.toInt) = readMessage.messageBuffer.getDouble
-          }
+          for (c <- workerCols)
+            tempRows(mb.rowStart.toInt)(c.toInt) = readMessage.getDouble
         }
       }
 
@@ -184,6 +165,77 @@ class WorkerClient extends Client with Serializable {
     }
 
     (tempRows, sendOverheads, receiveOverheads)
+//
+//
+//
+//
+//    val rows: Array[Long] = mh.getRowAssignments(ID)
+//    val cols: Array[Long] = mh.getColAssignments(ID)
+//
+//    val numRows: Long = math.ceil((rows(1) - rows(0) + 1) / rows(2)).toLong
+//    val numCols: Long = math.ceil((cols(1) - cols(0) + 1) / cols(2)).toLong
+//
+//    val numElements: Long = numRows * numCols
+//    val numMessages: Short = math.ceil((numElements * 8.0) / writeMessage.maxBodyLength).toShort
+//
+//    val numRowsPerMessage: Long = math.ceil(numRows / numMessages).toLong
+//    var numSentElements: Long = 0l
+//
+//    var rowStart: Long = 0
+//    var rowEnd: Long = 0
+//
+//    var sendOverheads: Array[Overhead] = Array.empty[Overhead]
+//    var receiveOverheads: Array[Overhead] = Array.empty[Overhead]
+//
+//    for (m <- 0 until numMessages) {
+//
+//      val sendStartTime = System.nanoTime
+//
+//      writeMessage.start(clientID, sessionID, Command.RequestMatrixBlocks)
+//      writeMessage.writeMatrixID(mh.id)
+//
+//      rowEnd += (numRowsPerMessage - 1) * rows(2)
+//
+//      var localRows: Array[Long] = Array.empty[Long]
+//
+//      rowIndices foreach (rowIndex => {
+//        localRows = localRows :+ rowIndex
+//      })
+//
+//      localRows.sorted
+//
+//      rowStart = localRows(0) + (rows(0) + (localRows(0) % rows(2))) % rows(2)
+//      rowEnd = localRows.last
+//
+//      writeMessage.writeLong(rowStart)
+//      writeMessage.writeLong(rowEnd)
+//      writeMessage.writeLong(rows(2))
+//      writeMessage.writeLong(cols(0))
+//      writeMessage.writeLong(cols(1))
+//      writeMessage.writeLong(cols(2))
+//
+//      val (sendBytes, sendTime) = sendMessage
+//      sendOverheads = sendOverheads :+ new Overhead(0, sendBytes, sendTime, System.nanoTime - sendStartTime)
+//
+//      val (receiveBytes, receiveTime) = receiveMessage
+//      val receiveStartTime = System.nanoTime
+//
+//      val mid: MatrixID = readMessage.readMatrixID
+//
+//      if (mh.id == mid) {
+//        val mb: MatrixBlock = readMessage.readMatrixBlock(false)
+//
+//        for (i <- mb.rows(0) to mb.rows(1) by mb.rows(2)) {
+//          for (j <- mb.cols(0) to mb.cols(1) by mb.cols(2)) {
+//            tempRows(i.toInt)(j.toInt) = readMessage.messageBuffer.getDouble
+//          }
+//        }
+//      }
+//
+//      receiveOverheads = receiveOverheads :+ new Overhead(1, receiveBytes, receiveTime, System.nanoTime - receiveStartTime)
+//    }
+//
+//    (tempRows, sendOverheads, receiveOverheads)
   }
 
   def addIndexedRow(index: Long, length: Long, values: Array[Double]): this.type = {

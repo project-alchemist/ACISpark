@@ -22,7 +22,7 @@ class MatrixHandle(val id: MatrixID = MatrixID(0), val name: String = "", val nu
 
   def getNumCols: Long = numCols
 
-  def getDimensions = (numRows, numCols)
+  def getDimensions: (Long, Long) = (numRows, numCols)
 
   def getSparse: Byte = sparse
 
@@ -30,44 +30,40 @@ class MatrixHandle(val id: MatrixID = MatrixID(0), val name: String = "", val nu
 
   def getGrid: ProcessGrid = grid
 
-  def getRowAssignments(ID: Short): Array[Long] = {
-
-    var rows: Array[Long] = Array.empty[Long]
+  def getRowAssignments(ID: Short): (Long, Long, Long) = {
 
     if (numRows == 1)
-      rows = Array(0l, 0l, 1l)
+      (0l, 0l, 1l)
     else {
       if (layout == Layout.MC_MR.value)
-        rows = Array(grid.array(ID)(0).toLong, numRows-1, grid.numRows.toLong)
+        (grid.array(ID)(0).toLong, numRows-1l, grid.numRows.toLong)
       else if (layout == Layout.MR_MC.value)
-        rows = Array(grid.array(ID)(1).toLong, numRows-1, grid.numCols.toLong)
+        (grid.array(ID)(1).toLong, numRows-1l, grid.numCols.toLong)
       else if (layout == Layout.VC_STAR.value)
-        rows = Array(grid.array(ID)(1).toLong, numRows-1, (grid.numCols * grid.numRows).toLong)
+        (grid.array(ID)(1).toLong, numRows-1l, grid.numCols.toLong * grid.numRows.toLong)
       else if (layout == Layout.VR_STAR.value)
-        rows = Array(grid.array(ID)(1).toLong, numRows-1, (grid.numCols * grid.numRows).toLong)
+        (grid.array(ID)(1).toLong, numRows-1l, grid.numCols.toLong * grid.numRows.toLong)
+      else
+        (0l, 0l, 1l)
     }
-
-    rows
   }
 
-  def getColAssignments(ID: Short): Array[Long] = {
-
-    var cols: Array[Long] = Array.empty[Long]
+  def getColAssignments(ID: Short): (Long, Long, Long) = {
 
     if (numCols == 1)
-      cols = Array(0l, 0l, 1l)
+      (0l, 0l, 1l)
     else {
       if (layout == Layout.MC_MR.value)
-        cols = Array(grid.array(ID)(0).toLong, numCols-1, grid.numCols.toLong)
+        (grid.array(ID)(0).toLong, numCols-1l, grid.numCols.toLong)
       else if (layout == Layout.MR_MC.value)
-        cols = Array(grid.array(ID)(1).toLong, numCols-1, grid.numRows.toLong)
+        (grid.array(ID)(1).toLong, numCols-1l, grid.numRows.toLong)
       else if (layout == Layout.VC_STAR.value)
-        cols = Array(grid.array(ID)(0).toLong, numCols-1, 1l)
+        (grid.array(ID)(0).toLong, numCols-1l, 1l)
       else if (layout == Layout.VR_STAR.value)
-        cols = Array(grid.array(ID)(0).toLong, numCols-1, 1l)
+        (grid.array(ID)(0).toLong, numCols-1l, 1l)
+      else
+        (0l, 0l, 1l)
     }
-
-    cols
   }
 
   def getIndexedRowMatrix: Option[IndexedRowMatrix] = AlchemistSession.getIndexedRowMatrix(this)
